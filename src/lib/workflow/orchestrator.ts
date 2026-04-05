@@ -245,20 +245,21 @@ async function runEvaluation(
     // Different lessons per run to demonstrate progressive learning
     const runNum = runs.get(runId)?.runNumber ?? 1;
     const lessonSets: Array<Array<{ category: string; insight: string }>> = [
-      // Run 1 lessons
+      // Run 1 lessons — problems discovered
       [
-        { category: "architecture", insight: "In-memory state for rate limiting must be evaluated for multi-instance correctness. Redis-backed state is required for distributed rate limiters." },
-        { category: "reliability", insight: "Audit buffer flush must use exponential backoff with jitter to prevent thundering herd when circuit breaker closes." },
+        { category: "architecture", insight: "Any processing that takes over 100ms must use async event queues, never synchronous in the request path. Synchronous processing caused timeout failures and latency spikes." },
+        { category: "reliability", insight: "Circuit breakers are mandatory on every external service call. Without them, a single downstream failure can cascade and crash the entire system." },
+        { category: "security", insight: "All API inputs must be validated with a schema before any business logic runs. Missing validation is a security risk and was found in code review." },
       ],
-      // Run 2 lessons (different, building on run 1)
+      // Run 2 lessons — refinements after fixes
       [
-        { category: "process", insight: "Connection pool configurations should be documented explicitly with specific values, not left as 'to be tuned later'." },
-        { category: "testing", insight: "Concurrent boundary tests must be included in the CI pipeline to catch race conditions early. Redis-backed state resolved the flaky test from the previous run." },
+        { category: "process", insight: "Cache invalidation must be explicitly designed alongside any caching strategy. Stale cache caused inconsistent data in production." },
+        { category: "testing", insight: "Concurrent request tests must be in the CI pipeline. The race condition that caused duplicate records was only caught because QA added this test." },
       ],
-      // Run 3+ lessons
+      // Run 3+ lessons — polish
       [
-        { category: "architecture", insight: "Correlation IDs should be mandatory in all audit events and propagated across service boundaries for end-to-end traceability." },
-        { category: "performance", insight: "Rate limit thresholds should be configurable per-route, not global — different endpoints have different traffic patterns and SLAs." },
+        { category: "performance", insight: "Rate limiting should be configured at the API gateway for all new endpoints to prevent abuse before requests reach the application layer." },
+        { category: "architecture", insight: "Feature flags should control not just visibility but also background processing, so incomplete features don't consume resources when disabled." },
       ],
     ];
     const setIdx = Math.min(runNum - 1, lessonSets.length - 1);

@@ -14,16 +14,28 @@ interface TaskInputProps {
 
 const presets = [
   {
-    title: "Add rate limiting and audit logs to the billing API",
+    title: "Build a user notification system",
     description:
-      "Implement endpoint-level and service-level rate limiting for billing API routes and add audit logging for admin actions. Avoid latency regressions and preserve current invoice processing throughput.",
-    project: "billing-api",
+      "Users should receive real-time notifications when their orders ship, payments process, or account settings change. Notifications should work across email, in-app alerts, and mobile push. Must not slow down the main checkout flow.",
+    project: "notifications",
   },
   {
-    title: "Add rate limiting and audit logging to invoice endpoints",
+    title: "Improve the notification system with user preferences",
     description:
-      "Extend the invoice endpoints with safe rate limiting and asynchronous audit logging. Past rollout had inconsistent enforcement, so design for reuse across handlers and services.",
-    project: "billing-api",
+      "Extend the notification system so users can choose which notifications they want (email, push, in-app) and set quiet hours. The first version had delivery delays and some users got duplicate notifications. Fix those issues too.",
+    project: "notifications",
+  },
+  {
+    title: "Build a password reset and account recovery flow",
+    description:
+      "Users who forget their password should be able to reset it via email link. Add account recovery options including phone verification. Must be secure against brute force attacks and phishing attempts.",
+    project: "user-auth",
+  },
+  {
+    title: "Add a product search and filtering feature",
+    description:
+      "Users should be able to search products by name, category, and price range. Results should load fast even with 100,000+ products. Include autocomplete suggestions and recent search history.",
+    project: "marketplace",
   },
 ];
 
@@ -106,20 +118,23 @@ export function TaskInput({ onRun, onSeed, onReset, busy, seeding }: TaskInputPr
             Run HydraSwarm
           </button>
 
-          {presets.map((preset, index) => (
-            <button
-              key={preset.title}
-              type="button"
-              onClick={() => {
-                setTitle(preset.title);
-                setDescription(preset.description);
-                setProject(preset.project);
-              }}
-              className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-accent-300 hover:text-accent-700"
-            >
-              Load Task {index + 1}
-            </button>
-          ))}
+          {presets.map((preset, index) => {
+            const labels = ["🔔 Notifications", "🔔 Improve Notifications", "🔑 Password Reset", "🔍 Product Search"];
+            return (
+              <button
+                key={preset.title}
+                type="button"
+                onClick={() => {
+                  setTitle(preset.title);
+                  setDescription(preset.description);
+                  setProject(preset.project);
+                }}
+                className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-accent-300 hover:text-accent-700"
+              >
+                {labels[index] ?? `Task ${index + 1}`}
+              </button>
+            );
+          })}
         </div>
       </form>
     </SectionCard>
