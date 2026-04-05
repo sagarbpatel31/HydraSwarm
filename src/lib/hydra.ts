@@ -63,8 +63,11 @@ export async function ensureTenant(): Promise<void> {
     if (
       message.includes("already exists") ||
       message.includes("409") ||
-      message.includes("Conflict")
+      message.includes("Conflict") ||
+      message.includes("Plan limit") ||
+      message.includes("403")
     ) {
+      // Tenant already exists or plan limit reached (tenant was created before)
       return;
     }
     throw err;
@@ -297,14 +300,27 @@ export async function getGraphRelations(
 function normalizeChunks(body: any): RecallItem[] {
   if (!body?.chunks) return [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return body.chunks.map((c: any) => ({
-    id: c.chunk_uuid ?? c.source_id ?? "unknown",
-    title: c.source_title ?? c.source_id ?? "untitled",
-    content: c.chunk_content ?? "",
-    score: c.relevancy_score ?? 0,
-    sourceType: c.source_type,
-    metadata: c.document_metadata,
-  }));
+  return body.chunks.map((c: any) => {
+    // Derive a meaningful title from source_title, source_id, or content
+    let title = c.source_title ?? "";
+    if (!title || title === "untitled") {
+      title = c.source_id ?? "";
+    }
+    if (!title) {
+      // Extract first heading or first line from content
+      const content = c.chunk_content ?? "";
+      const headingMatch = content.match(/^#+ (.+)/m);
+      title = headingMatch ? headingMatch[1].slice(0, 60) : content.slice(0, 60).split("\n")[0] || "Memory item";
+    }
+    return {
+      id: c.chunk_uuid ?? c.source_id ?? "unknown",
+      title,
+      content: c.chunk_content ?? "",
+      score: c.relevancy_score ?? 0,
+      sourceType: c.source_type,
+      metadata: c.document_metadata,
+    };
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
