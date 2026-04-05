@@ -1,98 +1,156 @@
-export default function Home() {
-  return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            HydraSwarm
-          </h1>
-          <p className="text-gray-600 mt-1">
-            AI Software Company with Institutional Memory
-          </p>
-        </header>
+"use client";
 
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">API Endpoints (Backend Ready)</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm font-mono">
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              <a href="/api/health" className="text-blue-600 hover:underline">/api/health</a>
-              <span className="text-gray-500 ml-2">— Health check</span>
-            </div>
-            <div className="p-3 bg-blue-50 rounded">
-              <span className="text-blue-700 font-bold">POST</span>{" "}
-              /api/seed
-              <span className="text-gray-500 ml-2">— Seed HydraDB</span>
-            </div>
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              <a href="/api/agents" className="text-blue-600 hover:underline">/api/agents</a>
-              <span className="text-gray-500 ml-2">— Agent roster</span>
-            </div>
-            <div className="p-3 bg-blue-50 rounded">
-              <span className="text-blue-700 font-bold">POST</span>{" "}
-              /api/runs
-              <span className="text-gray-500 ml-2">— Start a run</span>
-            </div>
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              /api/runs
-              <span className="text-gray-500 ml-2">— List all runs</span>
-            </div>
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              /api/runs/[runId]
-              <span className="text-gray-500 ml-2">— Run details</span>
-            </div>
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              /api/runs/[runId]/stream
-              <span className="text-gray-500 ml-2">— SSE live updates</span>
-            </div>
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              /api/lessons
-              <span className="text-gray-500 ml-2">— Extracted lessons</span>
-            </div>
-            <div className="p-3 bg-blue-50 rounded">
-              <span className="text-blue-700 font-bold">POST</span>{" "}
-              /api/memory/search
-              <span className="text-gray-500 ml-2">— Search memory</span>
-            </div>
-            <div className="p-3 bg-green-50 rounded">
-              <span className="text-green-700 font-bold">GET</span>{" "}
-              /api/memory/graph?runId=...
-              <span className="text-gray-500 ml-2">— Task graph</span>
+import { useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { TaskInput } from "@/components/TaskInput";
+import { AgentPipeline } from "@/components/AgentPipeline";
+import { ArtifactTabs } from "@/components/ArtifactTabs";
+import { MemoryPanel } from "@/components/MemoryPanel";
+import { GraphPanel } from "@/components/GraphPanel";
+import { ReplayTimeline } from "@/components/ReplayTimeline";
+import { SectionCard } from "@/components/SectionCard";
+import { seedDemo, runTask } from "@/lib/api";
+import type { PipelineStage, RunResult } from "@/lib/frontend-types";
+
+const stageOrder: PipelineStage[] = [
+  { role: "pm", label: "Scope and acceptance", status: "idle" },
+  { role: "architect", label: "Design and trade-offs", status: "idle" },
+  { role: "developer", label: "Implementation plan", status: "idle" },
+  { role: "reviewer", label: "Defect and safety review", status: "idle" },
+  { role: "qa", label: "Test design and regressions", status: "idle" },
+  { role: "sre", label: "Operational risk evaluation", status: "idle" },
+  { role: "cto", label: "Final decision", status: "idle" },
+];
+
+export default function HomePage() {
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const stages = useMemo(() => {
+    if (!runResult?.replay?.length) return stageOrder;
+
+    return stageOrder.map((stage) => {
+      const replay = runResult.replay?.find((item) => item.role === stage.role);
+      if (!replay) return stage;
+      return {
+        ...stage,
+        status: replay.status,
+        summary: replay.summary,
+        elapsedMs:
+          new Date(replay.finishedAt).getTime() - new Date(replay.startedAt).getTime(),
+      };
+    });
+  }, [runResult]);
+
+  const onSeed = async () => {
+    setSeeding(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await seedDemo();
+      setMessage(result.message || "Demo data seeded successfully.");
+    } catch (seedError) {
+      setError(seedError instanceof Error ? seedError.message : "Failed to seed demo data.");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const onRun = async (payload: { title: string; description: string; project: string }) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await runTask(payload);
+      setRunResult(result);
+      setMessage(`Run completed for "${result.task.title}".`);
+    } catch (runError) {
+      setError(runError instanceof Error ? runError.message : "Task execution failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-4 py-8 md:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <header className="rounded-[2rem] bg-gradient-to-r from-slate-950 via-slate-900 to-accent-900 p-8 text-white shadow-soft">
+          <p className="text-sm font-medium uppercase tracking-[0.24em] text-accent-200">HydraSwarm</p>
+          <div className="mt-3 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                AI software company simulation with institutional memory.
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-200 md:text-base">
+                Run a task through PM, Architect, Developer, Reviewer, QA, SRE, and CTO.
+                Persist artifacts and lessons in HydraDB, then show why the second run gets smarter.
+              </p>
             </div>
           </div>
+        </header>
+
+        <TaskInput onRun={onRun} onSeed={onSeed} onReset={() => { setRunResult(null); setMessage(null); setError(null); }} busy={busy} seeding={seeding} />
+
+        {message ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <CheckCircle2 className="h-4 w-4" />
+            {message}
+          </div>
+        ) : null}
+        {error ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <AlertCircle className="h-4 w-4" />
+            {error}
+          </div>
+        ) : null}
+
+        <AgentPipeline stages={stages} />
+
+        <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
+          <ArtifactTabs artifacts={[...(runResult?.artifacts ?? []), ...(runResult?.lessons ?? [])]} />
+          <MemoryPanel items={runResult?.recalledMemory ?? []} />
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Quick Test</h2>
-          <p className="text-gray-600 text-sm mb-3">
-            The frontend dashboard (agent cards, artifact tabs, timeline, graph) will be built here.
-            Backend API is fully functional — test with curl:
-          </p>
-          <pre className="bg-gray-900 text-green-400 p-4 rounded text-xs overflow-x-auto">
-{`# 1. Check health
-curl http://localhost:3000/api/health
-
-# 2. Seed demo data into HydraDB
-curl -X POST http://localhost:3000/api/seed
-
-# 3. Start a task run
-curl -X POST http://localhost:3000/api/runs \\
-  -H "Content-Type: application/json" \\
-  -d '{"taskDescription": "Add rate limiting and audit logs to the billing API"}'
-
-# 4. Get run details (replace RUN_ID)
-curl http://localhost:3000/api/runs/RUN_ID
-
-# 5. View extracted lessons
-curl http://localhost:3000/api/lessons`}
-          </pre>
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <GraphPanel graph={runResult?.graph ?? { nodes: [], edges: [] }} />
+          <ReplayTimeline events={runResult?.replay ?? []} />
         </div>
+
+        <SectionCard title="Evaluation" subtitle="CTO decision and extracted lessons.">
+          {runResult?.decision ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">
+                  Score: {runResult.decision.metadata?.run_number ? `Run #${runResult.decision.metadata.run_number} — ` : ""}
+                  {runResult.decision.content.match(/Score:\s*(\d+)/i)?.[1] ?? "N/A"}/10
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {runResult.decision.content.match(/Decision:\s*(.+)/i)?.[1] ?? "Pending"}
+                </p>
+              </div>
+              {runResult.lessons.length > 0 && (
+                <div className="rounded-2xl bg-emerald-50 p-4">
+                  <p className="text-sm font-semibold text-emerald-900">Lessons extracted ({runResult.lessons.length})</p>
+                  <ul className="mt-2 space-y-1">
+                    {runResult.lessons.map((l) => (
+                      <li key={l.artifactId} className="text-sm text-emerald-700">
+                        <span className="font-medium">[{l.title}]</span> {l.content}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-slate-200 p-8 text-sm text-slate-500">
+              Run a task to see the CTO decision and extracted lessons.
+            </div>
+          )}
+        </SectionCard>
       </div>
-    </div>
+    </main>
   );
 }
