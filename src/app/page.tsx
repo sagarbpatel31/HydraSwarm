@@ -209,15 +209,15 @@ export default function HomePage() {
             <AgentPipeline stages={stages} />
 
             {/* Content tabs */}
-            <div className="flex gap-1 border-b border-slate-200 pb-px">
+            <div className="flex gap-1.5 rounded-xl bg-white/60 backdrop-blur-sm border border-slate-200/80 p-1.5">
               {contentTabs.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setContentTab(tab.key)}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                     contentTab === tab.key
-                      ? "border-accent-500 text-accent-700"
-                      : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                      ? "bg-accent-600 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   {tab.icon} {tab.label}
@@ -249,19 +249,35 @@ export default function HomePage() {
                     {latestResult?.decision ? (
                       <div className="grid gap-4 md:grid-cols-[auto_1fr]">
                         {/* Score circle */}
-                        <div className="flex flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-accent-50 to-white border border-accent-200 p-6 min-w-[120px]">
-                          <span className="text-4xl font-bold text-accent-700">
-                            {latestResult.decision.content.match(/Score:\s*(\d+)/i)?.[1] ?? "?"}
-                          </span>
-                          <span className="text-xs text-slate-500 mt-1">out of 10</span>
-                          <span className={`mt-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                        <div className="flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 via-accent-50 to-emerald-50 border border-accent-200/50 p-6 min-w-[140px] shadow-sm">
+                          <div className="relative">
+                            <svg className="h-20 w-20" viewBox="0 0 80 80">
+                              <circle cx="40" cy="40" r="35" fill="none" stroke="#e2e8f0" strokeWidth="6" />
+                              <circle cx="40" cy="40" r="35" fill="none" stroke="url(#scoreGradient)" strokeWidth="6" strokeLinecap="round"
+                                strokeDasharray={`${(parseInt(latestResult.decision.content.match(/Score:\s*(\d+)/i)?.[1] ?? "0") / 10) * 220} 220`}
+                                transform="rotate(-90 40 40)" />
+                              <defs>
+                                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                  <stop offset="0%" stopColor="#2456f4" />
+                                  <stop offset="100%" stopColor="#10b981" />
+                                </linearGradient>
+                              </defs>
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-2xl font-black text-slate-800">
+                                {latestResult.decision.content.match(/Score:\s*(\d+)/i)?.[1] ?? "?"}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-medium">/ 10</span>
+                            </div>
+                          </div>
+                          <span className={`mt-3 rounded-full px-3 py-1 text-xs font-semibold ${
                             latestResult.decision.content.match(/Decision:\s*APPROVED(?!\s*WITH)/i)
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-amber-100 text-amber-700"
+                              ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
+                              : "bg-amber-100 text-amber-700 ring-1 ring-amber-200"
                           }`}>
                             {latestResult.decision.content.match(/Decision:\s*(.+)/i)?.[1]?.slice(0, 25) ?? "Pending"}
                           </span>
-                          <span className="mt-1 text-[10px] text-slate-400">Run #{latestResult.task.runNumber}</span>
+                          <span className="mt-1.5 text-[10px] text-slate-400 font-medium">Run #{latestResult.task.runNumber}</span>
                         </div>
                         {/* Lessons */}
                         <div>

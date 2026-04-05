@@ -6,15 +6,15 @@ import { SectionCard } from "@/components/SectionCard";
 import type { AgentArtifact, AgentRole } from "@/lib/frontend-types";
 import { statusClasses } from "@/lib/utils";
 
-const agentTabs: Array<{ role: string; emoji: string; label: string }> = [
-  { role: "pm", emoji: "📋", label: "PM" },
-  { role: "architect", emoji: "🏗️", label: "Architect" },
-  { role: "developer", emoji: "💻", label: "Developer" },
-  { role: "reviewer", emoji: "🔍", label: "Reviewer" },
-  { role: "qa", emoji: "🧪", label: "QA" },
-  { role: "sre", emoji: "🛡️", label: "SRE" },
-  { role: "cto", emoji: "👔", label: "CTO" },
-  { role: "shared", emoji: "💡", label: "Lessons" },
+const agentTabs: Array<{ role: string; emoji: string; label: string; activeColor: string }> = [
+  { role: "pm", emoji: "📋", label: "PM", activeColor: "bg-sky-600" },
+  { role: "architect", emoji: "🏗️", label: "Architect", activeColor: "bg-indigo-600" },
+  { role: "developer", emoji: "💻", label: "Developer", activeColor: "bg-violet-600" },
+  { role: "reviewer", emoji: "🔍", label: "Reviewer", activeColor: "bg-amber-600" },
+  { role: "qa", emoji: "🧪", label: "QA", activeColor: "bg-emerald-600" },
+  { role: "sre", emoji: "🛡️", label: "SRE", activeColor: "bg-rose-600" },
+  { role: "cto", emoji: "👔", label: "CTO", activeColor: "bg-slate-700" },
+  { role: "shared", emoji: "💡", label: "Lessons", activeColor: "bg-emerald-600" },
 ];
 
 export function ArtifactTabs({ artifacts }: { artifacts: AgentArtifact[] }) {
@@ -56,9 +56,9 @@ export function ArtifactTabs({ artifacts }: { artifacts: AgentArtifact[] }) {
               disabled={!hasContent}
               className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition-all ${
                 isSelected
-                  ? "bg-accent-600 text-white shadow-sm"
+                  ? `${tab.activeColor} text-white shadow-sm`
                   : hasContent
-                    ? "bg-white text-slate-600 border border-slate-200 hover:border-accent-300 hover:bg-accent-50"
+                    ? "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:shadow-sm"
                     : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
               }`}
             >
