@@ -26,12 +26,6 @@ const presets = [
     project: "notifications",
   },
   {
-    title: "Build a password reset and account recovery flow",
-    description:
-      "Users who forget their password should be able to reset it via email link. Add account recovery options including phone verification. Must be secure against brute force attacks and phishing attempts.",
-    project: "user-auth",
-  },
-  {
     title: "Add a product search and filtering feature",
     description:
       "Users should be able to search products by name, category, and price range. Results should load fast even with 100,000+ products. Include autocomplete suggestions and recent search history.",
@@ -119,7 +113,7 @@ export function TaskInput({ onRun, onSeed, onReset, busy, seeding }: TaskInputPr
           </button>
 
           {presets.map((preset, index) => {
-            const labels = ["🔔 Notifications", "🔔 Improve Notifications", "🔑 Password Reset", "🔍 Product Search"];
+            const labels = ["🔔 Task A: Notifications", "🔔 Task B: Improve It", "🔍 Task C: Product Search"];
             return (
               <button
                 key={preset.title}

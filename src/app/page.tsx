@@ -134,22 +134,30 @@ export default function HomePage() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 md:px-8">
+    <main className="min-h-screen px-4 py-6 md:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         {/* Header */}
-        <header className="relative overflow-hidden rounded-[2rem] bg-gradient-to-r from-slate-950 via-slate-900 to-accent-900 px-8 py-6 text-white shadow-soft">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(56,116,255,0.15),_transparent_50%)]" />
+        <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-indigo-950 to-accent-900 px-8 py-6 text-white shadow-lg">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(99,102,241,0.2),_transparent_50%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_rgba(16,185,129,0.1),_transparent_50%)]" />
           <div className="relative flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-accent-200">HydraSwarm</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-accent-400 to-emerald-400 flex items-center justify-center text-[10px] font-black">H</div>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent-200">HydraSwarm</p>
+              </div>
+              <h1 className="mt-2 text-xl font-semibold tracking-tight md:text-2xl">
                 AI software company with institutional memory
               </h1>
+              <p className="mt-1 text-xs text-slate-400 max-w-lg">
+                7 agents. 1 shared brain. Every run makes the next one smarter.
+              </p>
             </div>
             <div className="flex items-center gap-3">
               {runHistory.length > 0 && (
-                <div className="rounded-xl bg-white/10 px-3 py-1.5 text-sm backdrop-blur-sm">
-                  <span className="font-bold">{runHistory.length}</span> run{runHistory.length !== 1 ? "s" : ""}
+                <div className="rounded-xl bg-white/10 px-3 py-1.5 text-sm backdrop-blur-sm border border-white/10">
+                  <span className="font-bold text-emerald-300">{runHistory.length}</span>
+                  <span className="text-slate-300 ml-1">run{runHistory.length !== 1 ? "s" : ""}</span>
                 </div>
               )}
             </div>
