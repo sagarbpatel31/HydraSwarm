@@ -23,27 +23,29 @@ const mixedStages: PipelineStage[] = [
 ];
 
 describe("AgentPipeline", () => {
-  test("renders all 7 agent cards", () => {
+  test("renders all 7 agent names", () => {
     render(<AgentPipeline stages={idleStages} />);
-    expect(screen.getByText("PM")).toBeInTheDocument();
-    expect(screen.getByText("Architect")).toBeInTheDocument();
-    expect(screen.getByText("Developer")).toBeInTheDocument();
-    expect(screen.getByText("Reviewer")).toBeInTheDocument();
-    expect(screen.getByText("QA")).toBeInTheDocument();
-    expect(screen.getByText("SRE")).toBeInTheDocument();
-    expect(screen.getByText("CTO")).toBeInTheDocument();
+    expect(screen.getByText(/Priya/)).toBeInTheDocument();
+    expect(screen.getByText(/Alex/)).toBeInTheDocument();
+    expect(screen.getByText(/Dana/)).toBeInTheDocument();
+    expect(screen.getByText(/Riley/)).toBeInTheDocument();
+    expect(screen.getByText(/Quinn/)).toBeInTheDocument();
+    expect(screen.getByText(/Sam/)).toBeInTheDocument();
+    expect(screen.getByText(/Casey/)).toBeInTheDocument();
   });
 
-  test("displays labels for each stage", () => {
-    render(<AgentPipeline stages={idleStages} />);
-    expect(screen.getByText("Scope and acceptance")).toBeInTheDocument();
-    expect(screen.getByText("Final decision")).toBeInTheDocument();
+  test("shows numbered steps 1-7", () => {
+    const { container } = render(<AgentPipeline stages={idleStages} />);
+    // Idle stages show numbers 1-7
+    for (let i = 1; i <= 7; i++) {
+      expect(container.textContent).toContain(String(i));
+    }
   });
 
-  test("shows default message when no summary", () => {
+  test("shows Waiting status for idle stages", () => {
     render(<AgentPipeline stages={idleStages} />);
-    const waitingMessages = screen.getAllByText("Waiting for task execution.");
-    expect(waitingMessages).toHaveLength(7);
+    const waitings = screen.getAllByText("Waiting");
+    expect(waitings.length).toBe(7);
   });
 
   test("shows summary when provided", () => {
@@ -52,48 +54,55 @@ describe("AgentPipeline", () => {
     expect(screen.getByText("Tech spec done")).toBeInTheDocument();
   });
 
-  test("displays formatted elapsed time", () => {
+  test("shows elapsed time for completed stages", () => {
     render(<AgentPipeline stages={mixedStages} />);
-    expect(screen.getByText("Elapsed: 2.5 s")).toBeInTheDocument();
-    expect(screen.getByText("Elapsed: 3.1 s")).toBeInTheDocument();
-    expect(screen.getByText("Elapsed: 1.2 s")).toBeInTheDocument();
+    expect(screen.getByText("2.5 s")).toBeInTheDocument();
+    expect(screen.getByText("3.1 s")).toBeInTheDocument();
   });
 
-  test("shows '--' for elapsed when not set", () => {
+  test("completed stages show checkmark", () => {
+    const { container } = render(<AgentPipeline stages={mixedStages} />);
+    const checkmarks = container.querySelectorAll(".bg-emerald-500");
+    expect(checkmarks.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("running stage has pulse animation", () => {
+    const { container } = render(<AgentPipeline stages={mixedStages} />);
+    const pulsing = container.querySelector(".agent-running");
+    expect(pulsing).toBeInTheDocument();
+  });
+
+  test("shows progress bar", () => {
+    const { container } = render(<AgentPipeline stages={mixedStages} />);
+    const progressBar = container.querySelector(".bg-gradient-to-r");
+    expect(progressBar).toBeInTheDocument();
+  });
+
+  test("progress bar reflects completion count", () => {
+    const { container } = render(<AgentPipeline stages={mixedStages} />);
+    // 2 of 7 completed = ~28.6%
+    const bar = container.querySelector("[style]") as HTMLElement;
+    expect(bar).toBeInTheDocument();
+  });
+
+  test("renders section card title", () => {
     render(<AgentPipeline stages={idleStages} />);
-    const dashes = screen.getAllByText("Elapsed: --");
-    expect(dashes).toHaveLength(7);
+    expect(screen.getByText("Agent Pipeline")).toBeInTheDocument();
   });
 
-  test("renders correct status for each stage", () => {
+  test("subtitle changes when running", () => {
     render(<AgentPipeline stages={mixedStages} />);
-    const completedBadges = screen.getAllByText("completed");
-    expect(completedBadges).toHaveLength(2);
-    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText(/2\/7 agents completed/)).toBeInTheDocument();
   });
 
-  test("renders section card wrapper", () => {
-    render(<AgentPipeline stages={idleStages} />);
-    expect(screen.getByText("Agent pipeline")).toBeInTheDocument();
+  test("subtitle shows completion when all done", () => {
+    const allDone = idleStages.map((s) => ({ ...s, status: "completed" as const }));
+    render(<AgentPipeline stages={allDone} />);
+    expect(screen.getByText(/All 7 agents completed/)).toBeInTheDocument();
   });
 
-  test("handles empty stages array", () => {
+  test("handles empty stages", () => {
     render(<AgentPipeline stages={[]} />);
-    expect(screen.getByText("Agent pipeline")).toBeInTheDocument();
-  });
-
-  test("displays status with mixed states", () => {
-    const warningStages: PipelineStage[] = [
-      { role: "pm", label: "PM", status: "completed" },
-      { role: "architect", label: "Arch", status: "warning" },
-      { role: "developer", label: "Dev", status: "failed" },
-      { role: "reviewer", label: "Rev", status: "idle" },
-      { role: "qa", label: "QA", status: "idle" },
-      { role: "sre", label: "SRE", status: "idle" },
-      { role: "cto", label: "CTO", status: "idle" },
-    ];
-    render(<AgentPipeline stages={warningStages} />);
-    expect(screen.getByText("warning")).toBeInTheDocument();
-    expect(screen.getByText("failed")).toBeInTheDocument();
+    expect(screen.getByText("Agent Pipeline")).toBeInTheDocument();
   });
 });

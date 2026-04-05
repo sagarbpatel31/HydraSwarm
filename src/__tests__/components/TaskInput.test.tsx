@@ -10,17 +10,13 @@ const defaultProps = {
   seeding: false,
 };
 
-beforeEach(() => {
-  jest.clearAllMocks();
-});
+beforeEach(() => { jest.clearAllMocks(); });
 
 describe("TaskInput", () => {
-  test("renders with first preset values", () => {
+  test("renders with first preset values (notifications)", () => {
     render(<TaskInput {...defaultProps} />);
-    const titleInput = screen.getByDisplayValue(/rate limiting and audit logs to the billing API/i);
-    expect(titleInput).toBeInTheDocument();
-    const projectInput = screen.getByDisplayValue("billing-api");
-    expect(projectInput).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/notification system/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("notifications")).toBeInTheDocument();
   });
 
   test("renders seed, reset, and run buttons", () => {
@@ -30,10 +26,13 @@ describe("TaskInput", () => {
     expect(screen.getByText("Run HydraSwarm")).toBeInTheDocument();
   });
 
-  test("renders Load Task preset buttons", () => {
+  test("renders all 4 preset buttons", () => {
     render(<TaskInput {...defaultProps} />);
-    expect(screen.getByText("Load Task 1")).toBeInTheDocument();
-    expect(screen.getByText("Load Task 2")).toBeInTheDocument();
+    // Use getAllByText since "Notifications" appears in multiple places
+    expect(screen.getAllByText(/Notifications/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Improve Notifications/)).toBeInTheDocument();
+    expect(screen.getByText(/Password Reset/)).toBeInTheDocument();
+    expect(screen.getByText(/Product Search/)).toBeInTheDocument();
   });
 
   test("calls onSeed when seed button clicked", async () => {
@@ -50,34 +49,31 @@ describe("TaskInput", () => {
     expect(defaultProps.onReset).toHaveBeenCalledTimes(1);
   });
 
-  test("calls onRun with correct payload on form submit", async () => {
+  test("calls onRun with correct payload on submit", async () => {
     render(<TaskInput {...defaultProps} />);
     fireEvent.click(screen.getByText("Run HydraSwarm"));
     await waitFor(() => {
       expect(defaultProps.onRun).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: expect.stringContaining("rate limiting"),
-          project: "billing-api",
+          title: expect.stringContaining("notification"),
+          project: "notifications",
         })
       );
     });
   });
 
-  test("updates title on input change", async () => {
+  test("clicking Password Reset preset updates fields", () => {
     render(<TaskInput {...defaultProps} />);
-    const user = userEvent.setup();
-    const titleInput = screen.getByDisplayValue(/rate limiting and audit logs to the billing API/i);
-    await user.clear(titleInput);
-    await user.type(titleInput, "New title");
-    expect(titleInput).toHaveValue("New title");
+    fireEvent.click(screen.getByText(/Password Reset/));
+    expect(screen.getByDisplayValue(/password reset/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("user-auth")).toBeInTheDocument();
   });
 
-  test("loads Task 2 preset when clicked", () => {
+  test("clicking Product Search preset updates fields", () => {
     render(<TaskInput {...defaultProps} />);
-    fireEvent.click(screen.getByText("Load Task 2"));
-    // Title input changes to Task 2 title
-    const titleInput = screen.getByPlaceholderText(/Add rate limiting and audit logs/i) as HTMLInputElement;
-    expect(titleInput.value).toContain("invoice endpoints");
+    fireEvent.click(screen.getByText(/Product Search/));
+    expect(screen.getByDisplayValue(/product search/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("marketplace")).toBeInTheDocument();
   });
 
   test("disables run button when busy", () => {
@@ -92,26 +88,18 @@ describe("TaskInput", () => {
     expect(seedButton).toBeDisabled();
   });
 
-  test("disables seed button when busy", () => {
-    render(<TaskInput {...defaultProps} busy={true} />);
-    const seedButton = screen.getByText("Seed demo data").closest("button");
-    expect(seedButton).toBeDisabled();
+  test("updates title on input change", async () => {
+    render(<TaskInput {...defaultProps} />);
+    const user = userEvent.setup();
+    const titleInput = screen.getByDisplayValue(/notification system/i);
+    await user.clear(titleInput);
+    await user.type(titleInput, "Custom task");
+    expect(titleInput).toHaveValue("Custom task");
   });
 
   test("description textarea has 5 rows", () => {
     render(<TaskInput {...defaultProps} />);
     const textarea = screen.getByPlaceholderText(/Describe the engineering task/i);
     expect(textarea).toHaveAttribute("rows", "5");
-  });
-
-  test("switching between presets updates title field", () => {
-    render(<TaskInput {...defaultProps} />);
-    const titleInput = screen.getByPlaceholderText(/Add rate limiting and audit logs/i) as HTMLInputElement;
-
-    fireEvent.click(screen.getByText("Load Task 2"));
-    expect(titleInput.value).toContain("invoice endpoints");
-
-    fireEvent.click(screen.getByText("Load Task 1"));
-    expect(titleInput.value).toContain("billing API");
   });
 });

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Mock ReactFlow since it requires browser APIs
 jest.mock("reactflow", () => {
   const MockReactFlow = ({ children, nodes, edges }: any) => (
     <div data-testid="reactflow" data-nodes={JSON.stringify(nodes)} data-edges={JSON.stringify(edges)}>
@@ -16,7 +15,6 @@ jest.mock("reactflow", () => {
     MarkerType: { ArrowClosed: "arrowclosed" },
   };
 });
-
 jest.mock("reactflow/dist/style.css", () => ({}));
 
 import { render, screen } from "@testing-library/react";
@@ -27,9 +25,9 @@ const emptyGraph = { nodes: [] as FlowNode[], edges: [] as FlowEdge[] };
 
 const sampleGraph = {
   nodes: [
-    { id: "n1", position: { x: 50, y: 0 }, data: { label: "Task" } },
-    { id: "n2", position: { x: 50, y: 100 }, data: { label: "PM: prd" } },
-    { id: "n3", position: { x: 50, y: 200 }, data: { label: "Lesson" } },
+    { id: "n1", position: { x: 0, y: 40 }, data: { label: "Task", nodeType: "task" } },
+    { id: "n2", position: { x: 160, y: 40 }, data: { label: "PM: prd", nodeType: "pm" } },
+    { id: "n3", position: { x: 100, y: 180 }, data: { label: "Lesson", nodeType: "lesson" } },
   ] as FlowNode[],
   edges: [
     { id: "e1", source: "n1", target: "n2", label: "produces" },
@@ -40,7 +38,7 @@ const sampleGraph = {
 describe("GraphPanel", () => {
   test("shows placeholder when no nodes", () => {
     render(<GraphPanel graph={emptyGraph} />);
-    expect(screen.getByText(/Graph data will appear/i)).toBeInTheDocument();
+    expect(screen.getByText(/Graph appears after a run/i)).toBeInTheDocument();
   });
 
   test("renders ReactFlow when nodes exist", () => {
@@ -54,31 +52,32 @@ describe("GraphPanel", () => {
     expect(screen.getByTestId("rf-controls")).toBeInTheDocument();
   });
 
-  test("passes nodes to ReactFlow", () => {
+  test("passes nodes to ReactFlow with custom styles", () => {
     render(<GraphPanel graph={sampleGraph} />);
     const rf = screen.getByTestId("reactflow");
     const nodes = JSON.parse(rf.getAttribute("data-nodes") || "[]");
     expect(nodes).toHaveLength(3);
-    expect(nodes[0].id).toBe("n1");
+    // Nodes should have style objects
+    expect(nodes[0].style).toBeDefined();
+    expect(nodes[0].style.borderRadius).toBe(12);
   });
 
-  test("passes edges with markerEnd to ReactFlow", () => {
+  test("passes edges with markers to ReactFlow", () => {
     render(<GraphPanel graph={sampleGraph} />);
     const rf = screen.getByTestId("reactflow");
     const edges = JSON.parse(rf.getAttribute("data-edges") || "[]");
     expect(edges).toHaveLength(2);
     expect(edges[0].markerEnd).toBeDefined();
-    expect(edges[0].markerEnd.type).toBe("arrowclosed");
   });
 
-  test("renders section card with title", () => {
+  test("renders section card title", () => {
     render(<GraphPanel graph={emptyGraph} />);
     expect(screen.getByText("Task lineage graph")).toBeInTheDocument();
   });
 
-  test("container has correct height for graph", () => {
+  test("graph container has 550px height", () => {
     const { container } = render(<GraphPanel graph={sampleGraph} />);
-    const graphContainer = container.querySelector(".h-\\[420px\\]");
-    expect(graphContainer).toBeInTheDocument();
+    const graphDiv = container.querySelector(".h-\\[550px\\]");
+    expect(graphDiv).toBeInTheDocument();
   });
 });

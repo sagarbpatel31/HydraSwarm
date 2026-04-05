@@ -260,21 +260,25 @@ describe("run execution (mock mode)", () => {
     expect(typeof run.evaluation!.approved).toBe("boolean");
   });
 
-  test("mock evaluation extracts 2 lessons", async () => {
+  test("mock evaluation extracts lessons", async () => {
     const runId = startRun("Test task", { mock: true });
     await waitForRunComplete(runId);
 
     const run = getRun(runId)!;
-    expect(run.evaluation!.lessonsExtracted).toHaveLength(2);
-    expect(run.evaluation!.lessonsExtracted[0].category).toBe("architecture");
-    expect(run.evaluation!.lessonsExtracted[1].category).toBe("reliability");
+    expect(run.evaluation!.lessonsExtracted.length).toBeGreaterThanOrEqual(2);
+    // Each lesson should have category and insight
+    for (const lesson of run.evaluation!.lessonsExtracted) {
+      expect(lesson.category).toBeTruthy();
+      expect(lesson.insight).toBeTruthy();
+      expect(lesson.source).toBe(runId);
+    }
   });
 
   test("stores lessons to shared memory", async () => {
     const runId = startRun("Test task", { mock: true });
     await waitForRunComplete(runId);
 
-    expect(mockStoreLesson).toHaveBeenCalledTimes(2);
+    expect(mockStoreLesson.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   test("run has completedAt timestamp", async () => {

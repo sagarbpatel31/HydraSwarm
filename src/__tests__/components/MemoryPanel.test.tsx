@@ -1,98 +1,73 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import type { MemorySnippet } from "@/lib/frontend-types";
 
 const sampleItems: MemorySnippet[] = [
-  {
-    id: "m1",
-    title: "API Design Guide",
-    content: "REST conventions and error formats for all APIs.",
-    bucket: "knowledge",
-    score: 0.92,
-    role: "pm",
-  },
-  {
-    id: "m2",
-    title: "Circuit Breaker Mandate",
-    content: "All services handling financial data MUST have circuit breakers.",
-    bucket: "roleMemory",
-    role: "architect",
-  },
-  {
-    id: "m3",
-    title: "Q2 Priority",
-    content: "Reliability over features. Reduce P1 incidents by 50%.",
-    bucket: "sharedMemory",
-    score: 0.75,
-  },
+  { id: "m1", title: "API Design Guide", content: "REST conventions for APIs.", bucket: "knowledge", score: 0.92, role: "pm" },
+  { id: "m2", title: "Circuit Breaker Mandate", content: "All services MUST have circuit breakers.", bucket: "roleMemory", role: "architect" },
+  { id: "m3", title: "Q2 Priority", content: "Reliability over features.", bucket: "sharedMemory", score: 0.75 },
 ];
 
 describe("MemoryPanel", () => {
   test("shows placeholder when no items", () => {
     render(<MemoryPanel items={[]} />);
-    expect(screen.getByText(/No recall bundle yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Run a task to see what agents recall/i)).toBeInTheDocument();
   });
 
-  test("renders all memory items", () => {
+  test("renders section title", () => {
+    render(<MemoryPanel items={[]} />);
+    expect(screen.getByText("Recalled context")).toBeInTheDocument();
+  });
+
+  test("groups items by bucket with headers", () => {
+    render(<MemoryPanel items={sampleItems} />);
+    expect(screen.getByText(/Knowledge/)).toBeInTheDocument();
+    expect(screen.getByText(/Role memory/)).toBeInTheDocument();
+    expect(screen.getByText(/Shared lesson/)).toBeInTheDocument();
+  });
+
+  test("shows item titles in collapsed state", () => {
     render(<MemoryPanel items={sampleItems} />);
     expect(screen.getByText("API Design Guide")).toBeInTheDocument();
     expect(screen.getByText("Circuit Breaker Mandate")).toBeInTheDocument();
     expect(screen.getByText("Q2 Priority")).toBeInTheDocument();
   });
 
-  test("shows correct bucket labels", () => {
+  test("content is hidden in collapsed state", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText("Knowledge")).toBeInTheDocument();
-    expect(screen.getByText("Role memory")).toBeInTheDocument();
-    expect(screen.getByText("Shared lesson")).toBeInTheDocument();
+    expect(screen.queryByText("REST conventions for APIs.")).not.toBeInTheDocument();
   });
 
-  test("shows content for each item", () => {
+  test("clicking item expands to show content", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText(/REST conventions/)).toBeInTheDocument();
-    expect(screen.getByText(/circuit breakers/)).toBeInTheDocument();
-    expect(screen.getByText(/Reduce P1 incidents/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("API Design Guide"));
+    expect(screen.getByText("REST conventions for APIs.")).toBeInTheDocument();
   });
 
-  test("shows score badge when score is defined", () => {
+  test("clicking expanded item collapses it", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText("score 0.92")).toBeInTheDocument();
-    expect(screen.getByText("score 0.75")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("API Design Guide"));
+    expect(screen.getByText("REST conventions for APIs.")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("API Design Guide"));
+    expect(screen.queryByText("REST conventions for APIs.")).not.toBeInTheDocument();
   });
 
-  test("does not show score badge when score is undefined", () => {
-    const itemsWithoutScore: MemorySnippet[] = [
-      { id: "m1", title: "Test", content: "Content", bucket: "knowledge" },
-    ];
-    render(<MemoryPanel items={itemsWithoutScore} />);
-    expect(screen.queryByText(/score/)).not.toBeInTheDocument();
+  test("shows score when defined", () => {
+    render(<MemoryPanel items={sampleItems} />);
+    expect(screen.getByText("0.92")).toBeInTheDocument();
+    expect(screen.getByText("0.75")).toBeInTheDocument();
   });
 
-  test("shows role badge when role is defined", () => {
+  test("shows role badge for items with role", () => {
     render(<MemoryPanel items={sampleItems} />);
     expect(screen.getByText("pm")).toBeInTheDocument();
     expect(screen.getByText("architect")).toBeInTheDocument();
   });
 
-  test("does not show role badge when role is undefined", () => {
-    const noRoleItems: MemorySnippet[] = [
-      { id: "m1", title: "Shared", content: "Content", bucket: "sharedMemory" },
-    ];
-    render(<MemoryPanel items={noRoleItems} />);
-    // Should not have any role badge (only bucket label)
-    expect(screen.queryByText("pm")).not.toBeInTheDocument();
-  });
-
-  test("score 0 is displayed (not hidden)", () => {
-    const zeroScoreItems: MemorySnippet[] = [
-      { id: "m1", title: "Test", content: "Content", bucket: "knowledge", score: 0 },
-    ];
-    render(<MemoryPanel items={zeroScoreItems} />);
-    expect(screen.getByText("score 0.00")).toBeInTheDocument();
-  });
-
-  test("renders section card with correct title", () => {
-    render(<MemoryPanel items={[]} />);
-    expect(screen.getByText("Lessons and recalled context")).toBeInTheDocument();
+  test("shows bucket count in header", () => {
+    render(<MemoryPanel items={sampleItems} />);
+    expect(screen.getByText(/Knowledge \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Role memory \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Shared lesson \(1\)/)).toBeInTheDocument();
   });
 });

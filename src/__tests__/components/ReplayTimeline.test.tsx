@@ -4,37 +4,31 @@ import type { ReplayEvent } from "@/lib/frontend-types";
 
 const sampleEvents: ReplayEvent[] = [
   {
-    id: "e1",
-    role: "pm",
-    startedAt: "2026-04-04T10:00:00Z",
-    finishedAt: "2026-04-04T10:00:03Z",
+    id: "e1", role: "pm",
+    startedAt: "2026-04-04T10:00:00Z", finishedAt: "2026-04-04T10:00:03Z",
     summary: "Created product requirements with acceptance criteria.",
-    recalledLessonIds: ["lesson-001", "lesson-002"],
+    recalledLessonIds: ["lesson-001", "lesson-002", "lesson-003"],
     status: "completed",
   },
   {
-    id: "e2",
-    role: "architect",
-    startedAt: "2026-04-04T10:00:03Z",
-    finishedAt: "2026-04-04T10:00:06Z",
+    id: "e2", role: "architect",
+    startedAt: "2026-04-04T10:00:03Z", finishedAt: "2026-04-04T10:00:06Z",
     summary: "Designed system architecture with circuit breakers.",
     recalledLessonIds: [],
     status: "completed",
   },
   {
-    id: "e3",
-    role: "developer",
-    startedAt: "2026-04-04T10:00:06Z",
-    finishedAt: "2026-04-04T10:00:10Z",
+    id: "e3", role: "developer",
+    startedAt: "2026-04-04T10:00:06Z", finishedAt: "2026-04-04T10:00:10Z",
     summary: "Implementation plan with pseudocode.",
-    status: "completed",
+    status: "failed",
   },
 ];
 
 describe("ReplayTimeline", () => {
   test("shows placeholder when no events", () => {
     render(<ReplayTimeline events={[]} />);
-    expect(screen.getByText(/Timeline events will appear/i)).toBeInTheDocument();
+    expect(screen.getByText(/Timeline appears after a run/i)).toBeInTheDocument();
   });
 
   test("renders all events", () => {
@@ -44,70 +38,58 @@ describe("ReplayTimeline", () => {
     expect(screen.getByText(/Implementation plan/)).toBeInTheDocument();
   });
 
-  test("shows role badges for each event", () => {
+  test("shows role badges", () => {
     render(<ReplayTimeline events={sampleEvents} />);
     expect(screen.getByText("PM")).toBeInTheDocument();
     expect(screen.getByText("Architect")).toBeInTheDocument();
     expect(screen.getByText("Developer")).toBeInTheDocument();
   });
 
-  test("shows status badges for each event", () => {
+  test("shows status badges", () => {
     render(<ReplayTimeline events={sampleEvents} />);
     const completedBadges = screen.getAllByText("completed");
-    expect(completedBadges).toHaveLength(3);
+    expect(completedBadges).toHaveLength(2);
+    expect(screen.getByText("failed")).toBeInTheDocument();
   });
 
-  test("shows recalled lesson IDs when present", () => {
+  test("shows recalled count badge instead of raw UUIDs", () => {
     render(<ReplayTimeline events={sampleEvents} />);
-    expect(screen.getByText(/lesson-001, lesson-002/)).toBeInTheDocument();
+    // Should show count badge, NOT raw UUIDs
+    expect(screen.getByText(/3 recalled/)).toBeInTheDocument();
+    expect(screen.queryByText("lesson-001")).not.toBeInTheDocument();
   });
 
-  test("does not show recalled section when no lessons", () => {
+  test("does not show recalled badge when count is 0", () => {
     render(<ReplayTimeline events={[sampleEvents[1]]} />);
-    expect(screen.queryByText(/Recalled:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recalled/)).not.toBeInTheDocument();
   });
 
-  test("does not show recalled section when recalledLessonIds is undefined", () => {
+  test("does not show recalled badge when undefined", () => {
     render(<ReplayTimeline events={[sampleEvents[2]]} />);
-    expect(screen.queryByText(/Recalled:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recalled/)).not.toBeInTheDocument();
   });
 
-  test("renders timestamps", () => {
+  test("shows elapsed time in seconds", () => {
     render(<ReplayTimeline events={sampleEvents} />);
-    const startedLabels = screen.getAllByText(/Started:/);
-    const finishedLabels = screen.getAllByText(/Finished:/);
-    expect(startedLabels).toHaveLength(3);
-    expect(finishedLabels).toHaveLength(3);
+    const elapsed = screen.getAllByText("3s");
+    expect(elapsed.length).toBeGreaterThanOrEqual(1);
   });
 
-  test("has connector line between events but not after last", () => {
-    const { container } = render(<ReplayTimeline events={sampleEvents} />);
-    // Connector lines (absolute positioned divs with w-px)
-    const connectors = container.querySelectorAll(".w-px");
-    // First two events have connectors, last one doesn't
-    expect(connectors).toHaveLength(2);
-  });
-
-  test("single event has no connector line", () => {
-    const { container } = render(<ReplayTimeline events={[sampleEvents[0]]} />);
-    const connectors = container.querySelectorAll(".w-px");
-    expect(connectors).toHaveLength(0);
-  });
-
-  test("renders section card with correct title", () => {
+  test("renders section card title", () => {
     render(<ReplayTimeline events={[]} />);
     expect(screen.getByText("Replay timeline")).toBeInTheDocument();
   });
 
-  test("mixed statuses render correctly", () => {
-    const mixedEvents: ReplayEvent[] = [
-      { id: "e1", role: "pm", startedAt: "", finishedAt: "", summary: "Done", status: "completed" },
-      { id: "e2", role: "architect", startedAt: "", finishedAt: "", summary: "Working", status: "running" },
-      { id: "e3", role: "developer", startedAt: "", finishedAt: "", summary: "Failed", status: "failed" },
-    ];
-    render(<ReplayTimeline events={mixedEvents} />);
-    expect(screen.getByText("completed")).toBeInTheDocument();
-    expect(screen.getByText("running")).toBeInTheDocument();
-    expect(screen.getByText("failed")).toBeInTheDocument();
+  test("truncates long summaries", () => {
+    const longEvent: ReplayEvent = {
+      id: "long", role: "pm",
+      startedAt: "2026-04-04T10:00:00Z", finishedAt: "2026-04-04T10:00:03Z",
+      summary: "A".repeat(200),
+      status: "completed",
+    };
+    render(<ReplayTimeline events={[longEvent]} />);
+    // Summary should be truncated via line-clamp-2 CSS class
+    const summary = screen.getByText(/^A+/);
+    expect(summary.className).toContain("line-clamp-2");
   });
 });

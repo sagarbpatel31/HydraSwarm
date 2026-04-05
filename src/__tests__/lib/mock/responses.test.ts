@@ -76,16 +76,29 @@ describe("getMockResponse", () => {
     expect(response).toMatch(/Score:\s*\d+/i);
   });
 
-  test("Reviewer response references past lessons", () => {
+  test("Reviewer Run 1 response flags issues", () => {
     const response = getMockResponse("reviewer", taskDesc);
-    expect(response).toContain("past lesson");
+    expect(response).toContain("REVISE");
+    expect(response).toContain("Critical");
   });
 
-  test("responses reference institutional memory concepts", () => {
-    const architectResponse = getMockResponse("architect", taskDesc);
-    expect(architectResponse).toContain("postmortem");
+  test("Reviewer Run 2 response shows improvements", () => {
+    const response = getMockResponse("reviewer", taskDesc, 2, ["lesson-1"]);
+    expect(response).toContain("APPROVE");
+    expect(response).toContain("Resolved");
+  });
 
+  test("SRE response references operational concepts", () => {
     const sreResponse = getMockResponse("sre", taskDesc);
-    expect(sreResponse).toContain("circuit breaker");
+    expect(sreResponse).toContain("Rollback");
+    expect(sreResponse).toContain("Health check");
+  });
+
+  test("Run 2+ CTO score is higher than Run 1", () => {
+    const run1 = getMockResponse("cto", taskDesc, 1);
+    const run2 = getMockResponse("cto", taskDesc, 2, ["lesson"]);
+    const score1 = parseInt(run1.match(/Score:\s*(\d+)/i)?.[1] ?? "0");
+    const score2 = parseInt(run2.match(/Score:\s*(\d+)/i)?.[1] ?? "0");
+    expect(score2).toBeGreaterThan(score1);
   });
 });
