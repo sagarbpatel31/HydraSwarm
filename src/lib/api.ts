@@ -195,6 +195,114 @@ function mapStatus(
   }
 }
 
+/**
+ * Start a run without polling — returns the runId immediately.
+ * Use with SSE streaming for live updates.
+ */
+export async function startRunOnly(payload: {
+  title: string;
+  description: string;
+  project: string;
+}): Promise<string> {
+  const body = {
+    taskDescription: `${payload.title} - ${payload.description}`,
+    similarityKey: payload.project,
+  };
+
+  const startResp = await fetch(`${BASE}/api/runs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const startJson = await readJson<{ runId: string }>(startResp);
+  return startJson.runId;
+}
+
+/**
+ * Fetch a completed run and build the full RunResult.
+ */
+export async function fetchRunResult(runId: string): Promise<RunResult> {
+  const r = await fetch(`${BASE}/api/runs/${runId}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const j = await readJson<{ run?: any }>(r);
+  const run = j.run;
+  if (!run) throw new Error("Run not found");
+
+  const task = {
+    taskId: run.id,
+    title: run.taskDescription.slice(0, 120),
+    description: run.taskDescription,
+    project: run.similarityKey,
+    similarityKey: run.similarityKey,
+    runNumber: run.runNumber,
+  };
+
+  const artifacts: AgentArtifact[] = run.steps
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((s: any) => s.artifact)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((s: any) => ({
+      artifactId: s.artifact.id,
+      taskId: run.id,
+      role: s.artifact.agentRole,
+      artifactType: s.artifact.artifactType,
+      title: s.artifact.title,
+      content: s.artifact.content,
+      status: s.status ?? "",
+      metadata: s.artifact.metadata ?? {},
+    }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lessons = (run.evaluation?.lessonsExtracted ?? []).map((l: any) => ({
+    artifactId: l.id,
+    taskId: run.id,
+    role: "shared" as const,
+    artifactType: "lesson",
+    title: l.category,
+    content: l.insight,
+    status: "",
+    metadata: { source: l.source },
+  }));
+
+  const decision = artifacts.find((a) => a.role === "cto") || null;
+
+  const graphResp = await fetch(`${BASE}/api/memory/graph?runId=${run.id}`);
+  const rawGraph = await readJson<{
+    nodes: Array<{ id: string; label: string; type: string }>;
+    edges: Array<{ source: string; target: string; relation: string }>;
+  }>(graphResp);
+  const graph = transformGraph(rawGraph);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const replay = run.steps.map((s: any) => ({
+    id: s.artifact?.id ?? `${run.id}-${s.agentRole}`,
+    role: s.agentRole,
+    startedAt: s.startedAt,
+    finishedAt: s.completedAt,
+    summary: s.artifact?.content?.slice(0, 240) ?? "",
+    recalledLessonIds: s.recallContext?.filter((c: string) => c) ?? [],
+    status: mapStatus(s.status),
+  }));
+
+  const recalledMemory: MemorySnippet[] = run.steps
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((s: any) => s.recallContext?.length > 0)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .flatMap((s: any, idx: number) =>
+      s.recallContext.filter((c: string) => c).map((title: string, i: number) => ({
+        id: `recall-${idx}-${i}`,
+        title: title || "Recalled item",
+        content: `Recalled by ${s.agentRole} agent during task processing.`,
+        bucket: i < 3 ? "knowledge" as const : i < 5 ? "roleMemory" as const : "sharedMemory" as const,
+        role: s.agentRole,
+      }))
+    );
+
+  return { task, artifacts, lessons, decision, graph, replay, recalledMemory } as RunResult;
+}
+
+export { mapStatus, transformGraph };
+
 export async function getLessons() {
   const response = await fetch(`${BASE}/api/lessons`);
   return readJson<{ lessons: AgentArtifact[] }>(response);

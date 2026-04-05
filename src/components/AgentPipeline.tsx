@@ -23,7 +23,13 @@ export function AgentPipeline({ stages }: { stages: PipelineStage[] }) {
     <SectionCard title="Agent pipeline" subtitle="Watch the role-based company execute work in sequence.">
       <div className="grid gap-3 xl:grid-cols-7 md:grid-cols-3">
         {stages.map((stage) => (
-          <div key={stage.role} className="rounded-3xl border border-slate-200 p-4">
+          <div key={stage.role} className={`rounded-3xl border p-4 status-transition ${
+              stage.status === "running"
+                ? "border-accent-300 bg-accent-50/30 agent-running"
+                : stage.status === "completed"
+                  ? "border-emerald-200 bg-emerald-50/30"
+                  : "border-slate-200"
+            }`}>
             <div className="flex items-center justify-between gap-3">
               <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${roleAccent[stage.role]}`}>
                 {roleLabel[stage.role]}
