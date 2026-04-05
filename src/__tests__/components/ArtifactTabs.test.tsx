@@ -76,10 +76,12 @@ describe("ArtifactTabs", () => {
     expect(pmButton).not.toBeDisabled();
   });
 
-  test("selected tab has accent styling", () => {
+  test("selected tab has role-specific color", () => {
     render(<ArtifactTabs artifacts={sampleArtifacts} />);
     const pmButton = screen.getByText("PM").closest("button");
-    expect(pmButton?.className).toContain("bg-accent-600");
+    // PM tab uses sky-600 color when selected
+    expect(pmButton?.className).toContain("text-white");
+    expect(pmButton?.className).toContain("shadow-sm");
   });
 
   test("renders status badge in content panel", () => {

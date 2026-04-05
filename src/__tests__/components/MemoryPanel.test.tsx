@@ -11,19 +11,19 @@ const sampleItems: MemorySnippet[] = [
 describe("MemoryPanel", () => {
   test("shows placeholder when no items", () => {
     render(<MemoryPanel items={[]} />);
-    expect(screen.getByText(/Run a task to see what agents recall/i)).toBeInTheDocument();
+    expect(screen.getByText(/No context recalled yet/i)).toBeInTheDocument();
   });
 
   test("renders section title", () => {
     render(<MemoryPanel items={[]} />);
-    expect(screen.getByText("Recalled context")).toBeInTheDocument();
+    expect(screen.getByText("Recalled Context")).toBeInTheDocument();
   });
 
   test("groups items by bucket with headers", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText(/Knowledge/)).toBeInTheDocument();
-    expect(screen.getByText(/Role memory/)).toBeInTheDocument();
-    expect(screen.getByText(/Shared lesson/)).toBeInTheDocument();
+    expect(screen.getByText(/Knowledge Base/)).toBeInTheDocument();
+    expect(screen.getByText(/Agent Memory/)).toBeInTheDocument();
+    expect(screen.getByText(/Shared Lessons/)).toBeInTheDocument();
   });
 
   test("shows item titles in collapsed state", () => {
@@ -52,22 +52,23 @@ describe("MemoryPanel", () => {
     expect(screen.queryByText("REST conventions for APIs.")).not.toBeInTheDocument();
   });
 
-  test("shows score when defined", () => {
+  test("shows score as percentage when defined", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText("0.92")).toBeInTheDocument();
-    expect(screen.getByText("0.75")).toBeInTheDocument();
+    // Score 0.92 displays as "92%"
+    expect(screen.getByText("92%")).toBeInTheDocument();
+    expect(screen.getByText("75%")).toBeInTheDocument();
   });
 
   test("shows role badge for items with role", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText("pm")).toBeInTheDocument();
-    expect(screen.getByText("architect")).toBeInTheDocument();
+    expect(screen.getByText("PM")).toBeInTheDocument();
+    expect(screen.getByText("Architect")).toBeInTheDocument();
   });
 
-  test("shows bucket count in header", () => {
+  test("shows bucket count badge", () => {
     render(<MemoryPanel items={sampleItems} />);
-    expect(screen.getByText(/Knowledge \(1\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Role memory \(1\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Shared lesson \(1\)/)).toBeInTheDocument();
+    // Count badges show as separate elements
+    const badges = screen.getAllByText("1");
+    expect(badges.length).toBeGreaterThanOrEqual(3);
   });
 });

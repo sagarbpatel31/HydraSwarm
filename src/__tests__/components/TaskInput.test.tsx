@@ -26,13 +26,11 @@ describe("TaskInput", () => {
     expect(screen.getByText("Run HydraSwarm")).toBeInTheDocument();
   });
 
-  test("renders all 4 preset buttons", () => {
+  test("renders all 3 preset buttons", () => {
     render(<TaskInput {...defaultProps} />);
-    // Use getAllByText since "Notifications" appears in multiple places
-    expect(screen.getAllByText(/Notifications/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Improve Notifications/)).toBeInTheDocument();
-    expect(screen.getByText(/Password Reset/)).toBeInTheDocument();
-    expect(screen.getByText(/Product Search/)).toBeInTheDocument();
+    expect(screen.getByText(/Task A: Notifications/)).toBeInTheDocument();
+    expect(screen.getByText(/Task B: Improve It/)).toBeInTheDocument();
+    expect(screen.getByText(/Task C: Product Search/)).toBeInTheDocument();
   });
 
   test("calls onSeed when seed button clicked", async () => {
@@ -62,16 +60,9 @@ describe("TaskInput", () => {
     });
   });
 
-  test("clicking Password Reset preset updates fields", () => {
-    render(<TaskInput {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Password Reset/));
-    expect(screen.getByDisplayValue(/password reset/i)).toBeInTheDocument();
-    expect(screen.getByDisplayValue("user-auth")).toBeInTheDocument();
-  });
-
   test("clicking Product Search preset updates fields", () => {
     render(<TaskInput {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Product Search/));
+    fireEvent.click(screen.getByText(/Task C: Product Search/));
     expect(screen.getByDisplayValue(/product search/i)).toBeInTheDocument();
     expect(screen.getByDisplayValue("marketplace")).toBeInTheDocument();
   });

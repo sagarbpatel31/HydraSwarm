@@ -72,12 +72,12 @@ describe("GraphPanel", () => {
 
   test("renders section card title", () => {
     render(<GraphPanel graph={emptyGraph} />);
-    expect(screen.getByText("Task lineage graph")).toBeInTheDocument();
+    expect(screen.getByText("Task Lineage Graph")).toBeInTheDocument();
   });
 
-  test("graph container has 550px height", () => {
+  test("graph container has 500px height", () => {
     const { container } = render(<GraphPanel graph={sampleGraph} />);
-    const graphDiv = container.querySelector(".h-\\[550px\\]");
+    const graphDiv = container.querySelector(".h-\\[500px\\]");
     expect(graphDiv).toBeInTheDocument();
   });
 });

@@ -47,8 +47,8 @@ describe("SectionCard", () => {
     const { container } = render(<SectionCard title="Title">Content</SectionCard>);
     const section = container.firstChild as HTMLElement;
     expect(section.tagName).toBe("SECTION");
-    expect(section.className).toContain("rounded-3xl");
-    expect(section.className).toContain("bg-white");
+    expect(section.className).toContain("rounded-2xl");
+    expect(section.className).toContain("backdrop-blur");
   });
 
   test("title is an h2 element", () => {

@@ -29,8 +29,8 @@ export async function seedDemo() {
   };
 }
 
-// Start a run, poll until complete, transform into RunResult
-export async function runTask(payload: {
+// Legacy polling function — kept for fallback if SSE fails
+async function runTaskPolling(payload: {
   title: string;
   description: string;
   project: string;

@@ -1,38 +1,69 @@
 # HydraSwarm
 
-**Self-improving multi-agent software company powered by HydraDB institutional memory.**
+**Self-improving multi-agent AI software company powered by HydraDB institutional memory.**
 
-HydraSwarm simulates an AI software company where 7 role-based agents collaborate on engineering tasks. The system learns from past runs — Task 2 is visibly better because Task 1 changed the company's memory.
+> 7 agents. 1 shared brain. Every run makes the next one smarter.
+
+HydraSwarm simulates a software engineering company where 7 specialized AI agents collaborate on tasks. Unlike one-shot AI tools, HydraSwarm **remembers and improves** — every task writes new knowledge back to HydraDB, and the next similar task produces a measurably better result.
+
+## Why This Matters
+
+Most AI systems generate once and forget. HydraSwarm demonstrates **institutional learning**:
+
+- **Run 1**: Agents find issues (synchronous processing, missing circuit breakers) → Score 7/10
+- **Run 2**: Agents recall Run 1's lessons, fix the issues proactively → Score 8/10
+- **Run 3**: Further refinements from accumulated memory → Score 9/10
+
+The improvement is provable — the Compare Runs view shows it side-by-side.
 
 ## The Agents
 
-| Agent | Role | Produces |
-|-------|------|----------|
-| Priya | Product Manager | PRD with acceptance criteria |
-| Alex | Architect | Technical design with tradeoffs |
-| Dana | Developer | Implementation plan with pseudocode |
-| Riley | Reviewer | Code review with issues and severity |
-| Quinn | QA Engineer | Test plan with edge cases |
-| Sam | SRE | Runbook with rollback plan |
-| Casey | CTO | Final approve/revise/reject decision |
+| # | Agent | Emoji | Role | Produces |
+|---|-------|-------|------|----------|
+| 1 | Priya | 📋 | Product Manager | PRD with acceptance criteria |
+| 2 | Alex | 🏗️ | Architect | Technical design with tradeoffs |
+| 3 | Dana | 💻 | Developer | Implementation plan with pseudocode |
+| 4 | Riley | 🔍 | Reviewer | Code review with severity ratings |
+| 5 | Quinn | 🧪 | QA Engineer | Test plan with edge cases |
+| 6 | Sam | 🛡️ | SRE | Runbook with rollback plan |
+| 7 | Casey | 👔 | CTO | Final approve/revise/reject decision |
 
 ## How It Works
 
-1. User submits a task (e.g., "Add rate limiting to the billing API")
-2. Each agent **recalls** relevant knowledge, role memory, and shared lessons from HydraDB
-3. Each agent **generates** its artifact using the LLM + recalled context
-4. Each artifact is **stored** back to HydraDB
-5. After the CTO decides, **lessons are extracted** and stored as shared memory
-6. On the next similar task, agents recall those lessons and produce better outputs
+```
+User submits a task (e.g., "Build a notification system")
+       ↓
+Each agent (PM → Architect → Developer → Reviewer → QA → SRE → CTO):
+  1. RECALL — Queries HydraDB for relevant knowledge + agent memory + shared lessons
+  2. GENERATE — Produces output using LLM with recalled context
+  3. STORE — Saves artifact back to HydraDB
+       ↓
+Evaluator extracts lessons from the run → Stores to HydraDB shared memory
+       ↓
+Next run recalls those lessons → Produces better output
+```
+
+## Key Features
+
+- **Live Agent Thinking Log** — Dark terminal console showing every HydraDB query and storage operation in real-time
+- **SSE Streaming** — Watch agents activate one by one with live status updates (recalling → generating → storing → done)
+- **Run Comparison** — Side-by-side view showing score delta, recalled context diff, and "Improved" badges
+- **HydraDB Memory Explorer** — Browse all institutional memory with search, relevance scores, and per-agent filtering
+- **Progressive Scoring** — CTO score visibly improves across runs (7→8→9) as lessons accumulate
+- **Markdown Rendering** — All agent outputs rendered with proper headings, tables, code blocks
+- **326 Unit Tests** — Full coverage across 21 suites (backend + frontend + API + streaming)
 
 ## Tech Stack
 
-- **Framework**: Next.js (App Router) + TypeScript
-- **Styling**: Tailwind CSS
-- **Memory**: [HydraDB](https://hydradb.com) (`@hydra_db/node`)
-- **LLM**: OpenAI GPT-4o-mini
-- **Validation**: Zod
-- **Testing**: Jest + ts-jest
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Framework | Next.js 16 (App Router) + TypeScript | Full-stack in one repo, SSE support |
+| Styling | Tailwind CSS v4 | Gradient backgrounds, glass-effect cards |
+| Memory | [HydraDB](https://hydradb.com) (`@hydra_db/node`) | Semantic search, graph relations, multi-tenant memory |
+| LLM | OpenAI GPT-4o-mini | Fast, cheap (~$0.005/run), good quality |
+| Graph | React Flow | Task lineage visualization |
+| Validation | Zod | API input validation |
+| Testing | Jest + ts-jest + Testing Library | 326 tests across backend and frontend |
 
 ## Getting Started
 
@@ -48,89 +79,123 @@ cp .env.example .env.local
 
 # Start dev server
 npm run dev
-
-# Seed HydraDB with demo data
-curl -X POST http://localhost:3000/api/seed
-
-# Run a task
-curl -X POST http://localhost:3000/api/runs \
-  -H "Content-Type: application/json" \
-  -d '{"taskDescription": "Add rate limiting and audit logs to the billing API"}'
+# Open http://localhost:3000
 ```
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HYDRADB_API_KEY` | Yes | HydraDB API key |
-| `OPENAI_API_KEY` | Yes (when MOCK_MODE=false) | OpenAI API key |
-| `MOCK_MODE` | No | `true` for mock responses (default), `false` for real LLM |
+| `HYDRADB_API_KEY` | Yes | HydraDB API key from [hydradb.com](https://hydradb.com) |
+| `OPENAI_API_KEY` | When MOCK_MODE=false | OpenAI API key from [platform.openai.com](https://platform.openai.com) |
+| `MOCK_MODE` | No | `true` (default) for mock responses, `false` for real LLM |
 
 ## API Endpoints
 
 | Route | Method | Description |
 |-------|--------|-------------|
-| `/api/health` | GET | Health check (HydraDB connectivity) |
-| `/api/seed` | POST | Seed demo knowledge, memories, and lessons |
+| `/api/health` | GET | Health check — HydraDB connectivity + mock mode status |
+| `/api/seed` | POST | Seed 5 knowledge docs, 14 agent memories, 3 shared lessons |
 | `/api/agents` | GET | List all 7 agent definitions |
-| `/api/runs` | POST | Start a new task run |
-| `/api/runs` | GET | List all runs |
-| `/api/runs/[runId]` | GET | Get full run with all artifacts |
+| `/api/runs` | POST | Start a new 7-agent pipeline run |
+| `/api/runs` | GET | List all completed runs |
+| `/api/runs/[runId]` | GET | Full run with all artifacts and evaluation |
 | `/api/runs/[runId]/stream` | GET | SSE stream of live agent progress |
-| `/api/lessons` | GET | List all extracted lessons |
-| `/api/memory/search` | POST | Search HydraDB knowledge/memory |
-| `/api/memory/graph` | GET | Task lineage graph (nodes + edges) |
-| `/api/artifacts/[id]` | GET | Get a single artifact |
+| `/api/lessons` | GET | All extracted lessons across runs |
+| `/api/memory/search` | POST | Search HydraDB (knowledge, agent, shared) |
+| `/api/memory/explore` | GET | Browse all memory with stats |
+| `/api/memory/graph` | GET | Task lineage graph for React Flow |
+| `/api/artifacts/[id]` | GET | Single artifact by ID |
 
 ## Project Structure
 
 ```
 src/
-  app/api/          # Next.js route handlers (10 endpoints)
+  app/
+    page.tsx                    # Main dashboard (SSE, tabs, run history)
+    api/                        # 12 API route handlers
+  components/
+    AgentPipeline.tsx           # 7 agent cards with progress bar
+    ArtifactTabs.tsx            # Horizontal role tabs + markdown content
+    ThinkingLog.tsx             # Real-time terminal console
+    MemoryPanel.tsx             # Grouped recalled context with expand
+    MemoryExplorer.tsx          # Full HydraDB browser with search
+    GraphPanel.tsx              # React Flow task lineage
+    ReplayTimeline.tsx          # Stage timing with recall counts
+    RunComparison.tsx           # Side-by-side run diff
+    SectionCard.tsx             # Reusable glass-effect card
+    TaskInput.tsx               # Task form with 3 presets
   lib/
-    hydra.ts        # HydraDB wrapper (recall, store, graph)
-    llm.ts          # OpenAI GPT-4o-mini wrapper
-    config.ts       # Environment config
-    agents/         # Agent registry (7 agents)
-    workflow/       # Orchestrator + evaluator
-    prompts/        # Role-specific prompt templates
-    mock/           # Deterministic mock responses
-    seed/           # Demo data (5 knowledge docs, 14 agent memories, 3 shared lessons)
-  types/            # TypeScript interfaces
-  __tests__/        # Unit tests (164 tests)
+    hydra.ts                    # HydraDB wrapper (340 lines)
+    llm.ts                      # OpenAI GPT-4o-mini wrapper
+    stream.ts                   # SSE EventSource client
+    api.ts                      # Frontend API client + data transforms
+    config.ts                   # Environment configuration
+    utils.ts                    # UI utilities (cn, roleLabel, statusClasses)
+    frontend-types.ts           # Frontend display types
+    agents/registry.ts          # 7 agent definitions
+    workflow/orchestrator.ts    # Pipeline engine with SSE pub/sub
+    workflow/evaluator.ts       # Lesson extraction via LLM
+    prompts/system.ts           # Role-specific prompt builder
+    mock/responses.ts           # Task-adaptive mock responses
+    seed/                       # Demo data (knowledge, memories, lessons)
+  types/run.ts                  # Backend type definitions
+  __tests__/                    # 326 unit tests across 21 suites
 ```
+
+## HydraDB Integration
+
+HydraDB provides the institutional memory that makes learning possible:
+
+| HydraDB Feature | How We Use It |
+|-----------------|---------------|
+| **Knowledge ingestion** | Upload specs, postmortems, and agent artifacts as files |
+| **User memory** | Per-agent memories in isolated sub-tenants (`agent-pm`, `agent-architect`, etc.) |
+| **Shared memory** | Organization-wide lessons in `shared` sub-tenant |
+| **Full recall** | Hybrid semantic + keyword search with `alpha=0.7`, `recency_bias=0.3` |
+| **Preference recall** | Role-specific memory retrieval per sub-tenant |
+| **Graph relations** | Entity-relationship extraction for task lineage visualization |
+| **Inference** | `infer: true` extracts implicit insights from stored memories |
+
+All HydraDB operations go through a single wrapper (`lib/hydra.ts`) — the rest of the app never touches the SDK directly.
 
 ## Testing
 
 ```bash
-npm test              # Run all 164 tests
+npm test              # Run all 326 tests
 npm run test:coverage # Run with coverage report
 ```
 
-## HydraDB Data Model
-
-- **Tenant**: `hydraswarm`
-- **Sub-tenants**: `agent-pm`, `agent-architect`, ..., `agent-cto`, `shared`
-- **Knowledge**: Uploaded as files (specs, postmortems, runbooks)
-- **Agent Memory**: Role-specific lessons per sub-tenant
-- **Shared Memory**: Organizational lessons accessible to all agents
-- **Graph**: Entity relations extracted from knowledge for visualization
+| Category | Suites | Tests | Coverage |
+|----------|--------|-------|----------|
+| Backend (config, hydra, orchestrator, evaluator, prompts, seed, llm, registry, mock) | 9 | 164 | Core business logic |
+| Frontend Components (10 components) | 9 | 119 | All UI rendering + interactions |
+| Frontend Utils (api, utils, stream) | 3 | 43 | API transforms, SSE, utilities |
+| **Total** | **21** | **326** | |
 
 ## Demo Script
 
-1. Click **Seed Demo Data** to populate HydraDB
-2. Run **Task A**: "Add rate limiting and audit logs to the billing API"
-3. Watch 7 agents process sequentially with live SSE updates
-4. Check the **Lessons panel** — new lessons stored from Task A
-5. Run **Task B**: "Add rate limiting and audit logging to invoice endpoints"
-6. Observe agents recalling Task A's lessons and producing better outputs
-7. Compare scores — the company got smarter because its memory changed
+1. Open the app → Click **Seed demo data**
+2. Click **🔔 Task A: Notifications** → Click **Run HydraSwarm**
+3. Watch the **Thinking Log** — see HydraDB queries and LLM calls in real-time
+4. Check **Artifacts** tab → Read PM, Architect, Reviewer outputs
+5. Check **Evaluation** tab → Score 7/10, 3 lessons extracted
+6. Click **🔔 Task B: Improve It** → Run again
+7. Watch Thinking Log → More items recalled from HydraDB
+8. Check Evaluation → Score 8/10, reviewer now APPROVES
+9. Click **Compare Runs** → See side-by-side improvement proof
+10. Click **Memory Explorer** → Browse the full HydraDB brain
 
-## Team
+**The punchline**: "The company got smarter because its memory changed. That's HydraDB."
 
-- **Backend/Orchestration**: HydraDB, workflow engine, agents, prompts, API routes
-- **Frontend/Visualization**: Dashboard UI, agent cards, artifact tabs, timeline, graph
+## Cost
+
+| Mode | Cost per run | Notes |
+|------|-------------|-------|
+| Mock mode | Free | Pre-written responses, real HydraDB storage |
+| Real LLM | ~$0.005 | GPT-4o-mini, 7 sequential calls |
+| Full demo (10 runs) | ~$0.05 | Under 5 cents total |
 
 ---
 
-Built for a 24-hour hackathon.
+Built for HydraDB hackathon. [Sagar Patel](https://github.com/sagarbpatel31) + Gayatri Patil.

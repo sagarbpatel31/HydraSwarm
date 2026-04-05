@@ -11,7 +11,6 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
     "@hydra_db/node": "^0.1.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.7.0",
