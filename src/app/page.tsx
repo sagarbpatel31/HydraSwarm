@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, GitCompareArrows, Brain, BarChart3, FileText, Clock, Network } from "lucide-react";
+import { AlertCircle, CheckCircle2, GitCompareArrows, Brain, BarChart3, FileText, Network, Terminal } from "lucide-react";
 import { TaskInput } from "@/components/TaskInput";
 import { AgentPipeline } from "@/components/AgentPipeline";
 import { ArtifactTabs } from "@/components/ArtifactTabs";
 import { MemoryPanel } from "@/components/MemoryPanel";
 import { GraphPanel } from "@/components/GraphPanel";
 import { ReplayTimeline } from "@/components/ReplayTimeline";
+import { ThinkingLog, LogEntry } from "@/components/ThinkingLog";
 import { SectionCard } from "@/components/SectionCard";
 import { RunComparison } from "@/components/RunComparison";
 import { MemoryExplorer } from "@/components/MemoryExplorer";
@@ -31,7 +32,7 @@ function makeIdleStages(): PipelineStage[] {
 }
 
 type TopView = "dashboard" | "compare" | "memory";
-type ContentTab = "artifacts" | "memory" | "graph" | "evaluation";
+type ContentTab = "thinking" | "artifacts" | "memory" | "graph" | "evaluation";
 
 export default function HomePage() {
   const [runHistory, setRunHistory] = useState<RunResult[]>([]);
@@ -43,7 +44,9 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [topView, setTopView] = useState<TopView>("dashboard");
   const [contentTab, setContentTab] = useState<ContentTab>("artifacts");
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const logCounterRef = useRef(0);
 
   const onSeed = async () => {
     setSeeding(true); setError(null); setMessage(null);
@@ -54,6 +57,16 @@ export default function HomePage() {
       setError(err instanceof Error ? err.message : "Failed to seed.");
     } finally { setSeeding(false); }
   };
+
+  const agentEmojis: Record<string, string> = { pm: "📋", architect: "🏗️", developer: "💻", reviewer: "🔍", qa: "🧪", sre: "🛡️", cto: "👔" };
+
+  const addLog = useCallback((agent: string, type: LogEntry["type"], message: string) => {
+    const id = `log-${++logCounterRef.current}`;
+    const now = new Date();
+    const timestamp = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+    const emoji = agentEmojis[agent] ?? "🤖";
+    setLogEntries((prev) => [...prev, { id, timestamp, agent, emoji, type, message }]);
+  }, []);
 
   const handleStepUpdate = useCallback((step: StepUpdateData) => {
     setStages((prev) =>
@@ -70,11 +83,31 @@ export default function HomePage() {
         };
       })
     );
-  }, []);
+
+    // Generate thinking log entries
+    const role = step.agentRole;
+    const recalledCount = step.recallContext?.filter((c) => c).length ?? 0;
+
+    if (step.status === "recalling") {
+      addLog(role, "recall", `Querying HydraDB for relevant knowledge, agent memory, and shared lessons...`);
+    } else if (step.status === "generating") {
+      if (recalledCount > 0) {
+        addLog(role, "recall", `Found ${recalledCount} relevant items from institutional memory`);
+      }
+      addLog(role, "generate", `Generating output with GPT-4o-mini using recalled context...`);
+    } else if (step.status === "storing") {
+      addLog(role, "store", `Storing artifact to HydraDB knowledge base + agent memory...`);
+    } else if (step.status === "done") {
+      const chars = step.artifact?.content?.length ?? 0;
+      addLog(role, "done", `Complete — produced ${chars} chars in ${step.durationMs ? (step.durationMs / 1000).toFixed(1) + "s" : "?"}`);
+    }
+  }, [addLog]);
 
   const onRun = async (payload: { title: string; description: string; project: string }) => {
     setBusy(true); setError(null); setMessage(null);
-    setCurrentResult(null); setStages(makeIdleStages()); setContentTab("artifacts");
+    setCurrentResult(null); setStages(makeIdleStages()); setContentTab("thinking");
+    setLogEntries([]); logCounterRef.current = 0;
+    addLog("system", "info", `Starting new run...`);
     try {
       const runId = await startRunOnly(payload);
       const cleanup = connectToRunStream(runId, async (event) => {
@@ -85,6 +118,14 @@ export default function HomePage() {
             setCurrentResult(result);
             setRunHistory((prev) => [...prev, result]);
             setMessage(`Run #${result.task.runNumber} completed — "${result.task.title}"`);
+
+            // Log lessons
+            addLog("system", "info", `Run complete — CTO scored ${result.decision?.content.match(/Score:\s*(\d+)/i)?.[1] ?? "?"}/10`);
+            result.lessons.forEach((l) => {
+              addLog("system", "lesson", `New lesson stored: [${l.title}] ${l.content.slice(0, 80)}`);
+            });
+            addLog("system", "store", `${result.lessons.length} lessons written to HydraDB shared memory`);
+
             if (result.replay) {
               setStages((prev) => prev.map((s) => {
                 const r = result.replay?.find((e) => e.role === s.role);
@@ -127,6 +168,7 @@ export default function HomePage() {
   const latestResult = currentResult ?? runHistory[runHistory.length - 1] ?? null;
 
   const contentTabs: Array<{ key: ContentTab; label: string; icon: React.ReactNode }> = [
+    { key: "thinking", label: "Thinking Log", icon: <Terminal className="h-4 w-4" /> },
     { key: "artifacts", label: "Artifacts", icon: <FileText className="h-4 w-4" /> },
     { key: "memory", label: "Memory", icon: <Brain className="h-4 w-4" /> },
     { key: "graph", label: "Graph & Timeline", icon: <Network className="h-4 w-4" /> },
@@ -227,6 +269,10 @@ export default function HomePage() {
 
             {/* Content panel */}
             <div className="min-h-[400px]">
+              {contentTab === "thinking" && (
+                <ThinkingLog entries={logEntries} />
+              )}
+
               {contentTab === "artifacts" && (
                 <ArtifactTabs artifacts={[...(latestResult?.artifacts ?? []), ...(latestResult?.lessons ?? [])]} />
               )}
