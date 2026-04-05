@@ -285,16 +285,15 @@ export async function fetchRunResult(runId: string): Promise<RunResult> {
   }));
 
   // Use recallDetails (rich data) if available, fall back to recallContext (titles only)
-  const recalledMemory: MemorySnippet[] = run.steps
+  const allRecalled: MemorySnippet[] = run.steps
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((s: any) => (s.recallDetails?.length > 0) || (s.recallContext?.length > 0))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .flatMap((s: any) => {
-      // Prefer recallDetails (has actual content)
       if (s.recallDetails?.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return s.recallDetails.map((d: any) => ({
-          id: d.id,
+        return s.recallDetails.map((d: any, i: number) => ({
+          id: `${s.agentRole}-${d.id ?? i}`,
           title: d.title || "Recalled item",
           content: d.content || `Recalled by ${s.agentRole} agent.`,
           bucket: d.bucket ?? "knowledge",
@@ -302,21 +301,25 @@ export async function fetchRunResult(runId: string): Promise<RunResult> {
           role: s.agentRole,
         }));
       }
-      // Fallback to recallContext (title strings only)
       return s.recallContext
         .filter((c: string) => c)
         .map((title: string, i: number) => ({
-          id: `recall-${s.agentRole}-${i}`,
+          id: `${s.agentRole}-recall-${i}`,
           title: title || "Recalled item",
           content: `Recalled by ${s.agentRole} agent during task processing.`,
           bucket: i < 3 ? "knowledge" as const : i < 5 ? "roleMemory" as const : "sharedMemory" as const,
           role: s.agentRole,
         }));
-    })
-    // Deduplicate by id (same item recalled by multiple agents)
-    .filter((item: MemorySnippet, idx: number, arr: MemorySnippet[]) =>
-      arr.findIndex((other) => other.id === item.id && other.role === item.role) === idx
-    );
+    });
+
+  // Deduplicate by content (keep first occurrence, prefer highest score)
+  const seenContent = new Set<string>();
+  const recalledMemory: MemorySnippet[] = allRecalled.filter((item) => {
+    const key = item.title + "|" + item.bucket;
+    if (seenContent.has(key)) return false;
+    seenContent.add(key);
+    return true;
+  });
 
   return { task, artifacts, lessons, decision, graph, replay, recalledMemory } as RunResult;
 }
