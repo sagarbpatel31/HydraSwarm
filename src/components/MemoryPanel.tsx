@@ -1,57 +1,85 @@
-import { BrainCircuit, BookOpenText, Sparkles } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { BrainCircuit, BookOpenText, Sparkles, ChevronDown } from "lucide-react";
 import { SectionCard } from "@/components/SectionCard";
 import type { MemorySnippet } from "@/lib/frontend-types";
 
 const bucketMeta = {
-  knowledge: {
-    label: "Knowledge",
-    icon: BookOpenText,
-    classes: "bg-sky-50 text-sky-700 ring-sky-200",
-  },
-  roleMemory: {
-    label: "Role memory",
-    icon: BrainCircuit,
-    classes: "bg-violet-50 text-violet-700 ring-violet-200",
-  },
-  sharedMemory: {
-    label: "Shared lesson",
-    icon: Sparkles,
-    classes: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  },
+  knowledge: { label: "Knowledge", icon: BookOpenText, color: "text-sky-600", bg: "bg-sky-50", ring: "ring-sky-200" },
+  roleMemory: { label: "Role memory", icon: BrainCircuit, color: "text-violet-600", bg: "bg-violet-50", ring: "ring-violet-200" },
+  sharedMemory: { label: "Shared lesson", icon: Sparkles, color: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-200" },
 };
 
 export function MemoryPanel({ items }: { items: MemorySnippet[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Group by bucket
+  const grouped = items.reduce<Record<string, MemorySnippet[]>>((acc, item) => {
+    const key = item.bucket;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
   return (
-    <SectionCard title="Lessons and recalled context" subtitle="This panel proves HydraDB changed the company between runs.">
+    <SectionCard title="Recalled context" subtitle="What agents remembered from HydraDB before working.">
       {items.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 p-8 text-sm text-slate-500">
-          No recall bundle yet. Seed data and run a task to display role memory, project knowledge, and shared lessons.
-        </div>
+        <p className="text-sm text-slate-500 py-4 text-center">
+          Run a task to see what agents recall from institutional memory.
+        </p>
       ) : (
-        <div className="space-y-3">
-          {items.map((item) => {
-            const meta = bucketMeta[item.bucket];
+        <div className="space-y-4 max-h-[500px] overflow-y-auto">
+          {Object.entries(grouped).map(([bucket, bucketItems]) => {
+            const meta = bucketMeta[bucket as keyof typeof bucketMeta] ?? bucketMeta.knowledge;
             const Icon = meta.icon;
             return (
-              <div key={item.id} className="rounded-3xl border border-slate-200 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${meta.classes}`}>
-                    <Icon className="h-4 w-4" />
-                    {meta.label}
+              <div key={bucket}>
+                {/* Bucket header */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className={`h-4 w-4 ${meta.color}`} />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    {meta.label} ({bucketItems.length})
                   </span>
-                  {item.role ? (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                      {item.role}
-                    </span>
-                  ) : null}
-                  {typeof item.score === "number" ? (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-                      score {item.score.toFixed(2)}
-                    </span>
-                  ) : null}
                 </div>
-                <h3 className="mt-3 text-sm font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{item.content}</p>
+
+                {/* Compact items */}
+                <div className="space-y-1">
+                  {bucketItems.map((item) => {
+                    const isExpanded = expandedId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`rounded-xl border transition-all cursor-pointer ${
+                          isExpanded ? "border-slate-300 bg-slate-50" : "border-slate-100 hover:border-slate-200"
+                        }`}
+                      >
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                        >
+                          <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ${meta.bg} ${meta.color} ${meta.ring}`}>
+                            {item.role ?? bucket}
+                          </span>
+                          <span className="flex-1 text-xs font-medium text-slate-700 truncate">
+                            {item.title}
+                          </span>
+                          {typeof item.score === "number" && (
+                            <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              {item.score.toFixed(2)}
+                            </span>
+                          )}
+                          <ChevronDown className={`h-3 w-3 text-slate-400 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                        </button>
+                        {isExpanded && (
+                          <div className="px-3 pb-3">
+                            <p className="text-xs text-slate-600 leading-relaxed">{item.content}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}

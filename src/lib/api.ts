@@ -158,12 +158,18 @@ function transformGraph(rawGraph: {
   nodes: Array<{ id: string; label: string; type: string }>;
   edges: Array<{ source: string; target: string; relation: string }>;
 }): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  const nodes: FlowNode[] = rawGraph.nodes.map((n, i) => ({
-    id: n.id,
-    type: "default",
-    position: { x: 50, y: i * 100 },
-    data: { label: n.label, nodeType: n.type },
-  }));
+  // Horizontal left-to-right layout: agents in a row, lessons below
+  const nodes: FlowNode[] = rawGraph.nodes.map((n, i) => {
+    const isLesson = n.type === "lesson";
+    return {
+      id: n.id,
+      type: "default",
+      position: isLesson
+        ? { x: 100 + (i - rawGraph.nodes.filter(x => x.type !== "lesson").length) * 200, y: 180 }
+        : { x: i * 160, y: 40 },
+      data: { label: n.label, nodeType: n.type },
+    };
+  });
 
   const edges: FlowEdge[] = rawGraph.edges.map((e, i) => ({
     id: `edge-${i}`,
