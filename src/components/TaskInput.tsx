@@ -45,8 +45,8 @@ export function TaskInput({ onRun, onSeed, onReset, busy, seeding }: TaskInputPr
 
   return (
     <SectionCard
-      title="Task intake"
-      subtitle="Seed the demo, submit a feature request, and compare Task A vs Task B improvements."
+      title="🚀 Submit a Feature Request"
+      subtitle="Step 1: Seed the brain → Step 2: Run Task A → Step 3: Run Task B → Compare how the company improved."
       actions={
         <div className="flex flex-wrap gap-2">
           <button
