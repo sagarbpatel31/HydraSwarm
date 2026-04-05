@@ -65,10 +65,19 @@ export type StepStatus =
   | "done"
   | "error";
 
+export interface RecallDetail {
+  id: string;
+  title: string;
+  content: string;
+  score: number;
+  bucket: "knowledge" | "roleMemory" | "sharedMemory";
+}
+
 export interface AgentStep {
   agentRole: AgentRole;
   status: StepStatus;
   recallContext?: string[];
+  recallDetails?: RecallDetail[];
   artifact?: Artifact;
   startedAt?: string;
   completedAt?: string;

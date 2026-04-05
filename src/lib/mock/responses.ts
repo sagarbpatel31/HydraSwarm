@@ -1,19 +1,31 @@
 import { AgentRole } from "@/types/run";
 
+/**
+ * Returns mock agent responses that vary based on run number.
+ * Run 1: baseline with some issues found
+ * Run 2+: improved because of learned lessons
+ */
 export function getMockResponse(
   role: AgentRole,
-  taskDescription: string
+  taskDescription: string,
+  runNumber: number = 1,
+  recalledLessons: string[] = []
 ): string {
-  const responses: Record<AgentRole, string> = {
-    pm: `# Product Requirements Document
+  const hasLessons = recalledLessons.length > 0 || runNumber > 1;
+  const lessonBlock = hasLessons
+    ? `\n\n> **Institutional Memory Applied**: Based on ${recalledLessons.length || "previous"} recalled lessons, this output incorporates improvements from past runs.\n`
+    : "";
+
+  const responses: Record<AgentRole, () => string> = {
+    pm: () => `# Product Requirements Document
 
 ## Problem Statement
 ${taskDescription}
-
+${lessonBlock}
 ## Goals
 - Implement the requested feature with production-grade quality
 - Ensure compatibility with existing billing infrastructure
-- Meet Q2 reliability targets
+- Meet Q2 reliability targets${hasLessons ? "\n- **[Learned]** Ensure rate limiting is applied at BOTH gateway and service layer (past inconsistency)" : ""}
 
 ## Non-Goals
 - Full redesign of the billing architecture
@@ -30,7 +42,7 @@ ${taskDescription}
 - Audit logs capture: user, action, timestamp, request ID, outcome
 - All audit logging is asynchronous (not blocking the request path)
 - 80% test coverage on new code
-- Feature flag controls rate limiting activation
+- Feature flag controls rate limiting activation${hasLessons ? "\n- **[Learned]** Rate limiter state must be Redis-backed, not in-memory (multi-instance correctness)" : ""}
 
 ## Open Questions
 - What rate limit thresholds should we use? (Suggesting 100 req/min per API key)
@@ -38,14 +50,14 @@ ${taskDescription}
 
 ## Risk Notes
 - Based on past incidents, rate limiting must be applied at both gateway AND service layer
-- Audit logging must be async to avoid the latency issues seen in the notifications feature
+- Audit logging must be async to avoid the latency issues seen in the notifications feature${hasLessons ? "\n- **[Learned from Run " + (runNumber - 1) + "]** Audit buffer flush must use exponential backoff with jitter" : ""}
 `,
 
-    architect: `# Technical Design Document
+    architect: () => `# Technical Design Document
 
 ## System Context
 This feature adds rate limiting and audit logging to the billing API, which currently handles ~500 rps at peak.
-
+${lessonBlock}
 ## Component Design
 
 ### Rate Limiting
@@ -53,13 +65,13 @@ This feature adds rate limiting and audit logging to the billing API, which curr
 - **Layer 2 — Service Middleware**: Per-route rate limiting middleware in the billing service
 - Both layers must be present per our API design guide (rate limiting at only one layer is insufficient)
 - Configuration stored in environment variables, not hardcoded
-
+${hasLessons ? "- **[Learned]** Rate limiter state MUST be Redis-backed for distributed consistency across pods. In-memory state caused race conditions in prior implementation.\n" : ""}
 ### Audit Logging
 - **Async event queue** using Redis pub/sub → dedicated audit log consumer
 - NOT synchronous in the request path (lesson from notifications feature: sync logging added 200ms)
 - Audit events: { user_id, action, resource, timestamp, request_id, outcome, metadata }
 - Storage: PostgreSQL audit_logs table with 90-day retention
-
+${hasLessons ? "- **[Learned]** Buffer flush strategy must use exponential backoff with jitter to prevent thundering herd when circuit breaker closes\n" : ""}
 ### Circuit Breaker
 - Circuit breaker on Redis connection for audit queue (per March 2025 postmortem mandate)
 - Fallback: buffer audit events in memory with periodic flush
@@ -86,25 +98,26 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 | Redis unavailability for audit queue | Circuit breaker + in-memory buffer fallback |
 | Rate limit bypass via multiple API keys | Per-account aggregate rate limiting |
 | Connection pool exhaustion under load | Tuned pool sizes based on load testing (lesson from payment outage) |
+${hasLessons ? "| In-memory rate limiter race condition | **[Learned]** Redis-backed state for distributed consistency |" : ""}
 
 ## References to Past Decisions
 - March 2025 postmortem: circuit breaker mandate, connection pool tuning
 - Notifications feature: async logging pattern validated
-- API design guide: dual-layer rate limiting requirement
+- API design guide: dual-layer rate limiting requirement${hasLessons ? "\n- **Run " + (runNumber - 1) + " lessons**: Redis-backed rate limiting, backoff with jitter" : ""}
 `,
 
-    developer: `# Implementation Plan
+    developer: () => `# Implementation Plan
 
 ## Files Changed
 
 ### New Files
-- \`src/middleware/rateLimiter.ts\` — Token bucket rate limiter middleware
+- \`src/middleware/rateLimiter.ts\` — Token bucket rate limiter middleware${hasLessons ? " **(Redis-backed per learned lesson)**" : ""}
 - \`src/services/auditLogger.ts\` — Async audit logging service
 - \`src/queue/auditConsumer.ts\` — Redis queue consumer for audit events
 - \`src/migrations/001_create_audit_logs.sql\` — Database migration
 - \`src/tests/rateLimiter.test.ts\` — Rate limiter unit tests
 - \`src/tests/auditLogger.test.ts\` — Audit logger unit tests
-
+${hasLessons ? "- `src/lib/backoff.ts` — **[Learned]** Exponential backoff with jitter utility\n" : ""}
 ### Modified Files
 - \`src/routes/billing.ts\` — Add rate limiter middleware to routes
 - \`src/config/index.ts\` — Add rate limit and audit config from env vars
@@ -112,15 +125,15 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 
 ## Core Logic
 
-### Rate Limiter (Token Bucket)
+### Rate Limiter (${hasLessons ? "Redis-Backed" : "Token Bucket"})
 \`\`\`pseudo
-class TokenBucketRateLimiter:
-  constructor(maxTokens, refillRate, keyExtractor):
-    this.buckets = new Map()
+class ${hasLessons ? "Redis" : ""}TokenBucketRateLimiter:
+  constructor(${hasLessons ? "redisClient, " : ""}maxTokens, refillRate, keyExtractor):
+    ${hasLessons ? "this.redis = redisClient  // Learned: must be distributed" : "this.buckets = new Map()"}
 
   middleware(req, res, next):
     key = keyExtractor(req)  // API key or user ID
-    bucket = getBucket(key)
+    bucket = ${hasLessons ? "await this.redis.get(key)" : "getBucket(key)"}
     if bucket.tryConsume():
       next()
     else:
@@ -128,20 +141,19 @@ class TokenBucketRateLimiter:
         error: "RATE_LIMIT_EXCEEDED",
         retryAfter: bucket.nextRefillSeconds()
       })
-      res.setHeader("Retry-After", bucket.nextRefillSeconds())
 \`\`\`
 
-### Audit Logger (Async)
+### Audit Logger (Async${hasLessons ? " with Backoff" : ""})
 \`\`\`pseudo
 class AuditLogger:
   constructor(redisClient, circuitBreaker):
     this.queue = redisClient
     this.breaker = circuitBreaker
-    this.buffer = []  // fallback buffer
+    this.buffer = []
 
   async log(event):
     if this.breaker.isOpen():
-      this.buffer.push(event)  // fallback
+      this.buffer.push(event)
       return
     try:
       await this.queue.publish("audit_events", event)
@@ -150,51 +162,73 @@ class AuditLogger:
       this.buffer.push(event)
 
   async flushBuffer():
-    // Periodic flush of buffered events when circuit closes
+    ${hasLessons ? "// Learned: use exponential backoff with jitter\n    for event in this.buffer:\n      await backoffWithJitter(() => this.queue.publish(event))" : "// Periodic flush of buffered events when circuit closes"}
 \`\`\`
 
 ## Error Handling
 - Rate limiter: graceful degradation (allow traffic) if state store is unavailable
 - Audit logger: buffer events locally if Redis is down; flush when reconnected
 - All external calls wrapped in try/catch with typed errors
-
-## Dependencies
-- \`ioredis\` for Redis pub/sub
-- \`opossum\` for circuit breaker implementation
-- No new database dependencies (using existing PostgreSQL)
 `,
 
-    reviewer: `# Code Review
+    reviewer: () => {
+      if (hasLessons) {
+        return `# Code Review
 
 ## Summary
-The implementation plan for rate limiting and audit logging is generally solid and follows team standards. The async audit logging pattern is correct (avoiding the sync logging mistake from the notifications feature). However, there are several issues that need attention before approval.
+The implementation plan for rate limiting and audit logging is **significantly improved** compared to the previous iteration. Key lessons from past runs have been incorporated, resulting in fewer critical issues.
+${lessonBlock}
+## Issues Found
+
+### Major
+1. **Connection pool size not specified**: While the architecture mentions tuning, the implementation plan doesn't include specific configuration values.
+   - **Suggested fix**: Add connection pool config to \`src/config/index.ts\` with documented defaults.
+
+### Minor
+2. **Missing correlation ID in audit events**: Audit events should include the request correlation ID for cross-service tracing.
+3. **Rate limit config should be per-route**: Different billing endpoints may need different thresholds.
+
+## Improvements Over Previous Runs
+- **[Resolved]** Rate limiter is now Redis-backed (was in-memory — caused race conditions)
+- **[Resolved]** Audit buffer flush now uses exponential backoff with jitter (was fixed-interval — caused thundering herd)
+- **[Resolved]** Gateway + service layer rate limiting is specified (was single-layer only)
+
+## Approval Status
+**APPROVE** — The major lesson-driven improvements have been addressed. Remaining issues are minor and can be fixed during implementation.
+
+## Confidence: 0.91
+`;
+      }
+      return `# Code Review
+
+## Summary
+The implementation plan for rate limiting and audit logging is generally solid and follows team standards. The async audit logging pattern is correct. However, there are several issues that need attention before approval.
 
 ## Issues Found
 
 ### Critical
-1. **Missing rate limiter at service layer**: The implementation only shows middleware-level rate limiting. Per our API design guide, rate limiting must exist at BOTH the gateway and service/middleware layer. The gateway configuration is not specified.
-   - **Suggested fix**: Add gateway-level rate limiting config (nginx/envoy) alongside the middleware implementation.
-
-### Major
-2. **No exponential backoff in audit buffer flush**: When the circuit breaker closes and buffered events flush, there's no backoff strategy. This could cause a thundering herd of audit writes.
-   - **Suggested fix**: Implement gradual flush with exponential backoff + jitter (per March 2025 postmortem lessons).
-   - **Linked past lesson**: Payment outage — retry without jitter caused traffic amplification.
-
-3. **Rate limiter state not shared across instances**: Token bucket state is in-memory per instance. In a multi-pod deployment, users could exceed limits by hitting different pods.
+1. **Rate limiter uses in-memory state**: Token bucket state is in-memory per instance. In a multi-pod deployment, users could exceed limits by hitting different pods.
    - **Suggested fix**: Use Redis-backed rate limiter state for distributed consistency.
 
-### Minor
-4. **Hardcoded rate limit values in pseudocode**: The config mentions env vars but the pseudocode shows hardcoded constructor params. Ensure all values come from configuration.
+### Major
+2. **No exponential backoff in audit buffer flush**: When the circuit breaker closes and buffered events flush, there's no backoff strategy. This could cause a thundering herd.
+   - **Suggested fix**: Implement gradual flush with exponential backoff + jitter.
+   - **Linked past lesson**: Payment outage — retry without jitter caused traffic amplification.
 
-5. **Missing correlation ID in audit events**: Audit events should include the request correlation ID for tracing across services.
+3. **Missing rate limiter at gateway layer**: Implementation only shows middleware-level. Per API design guide, must exist at BOTH layers.
+
+### Minor
+4. **Hardcoded rate limit values**: Config mentions env vars but pseudocode shows hardcoded constructor params.
+5. **Missing correlation ID in audit events**: Needed for cross-service tracing.
 
 ## Approval Status
-**REVISE** — Address the critical and major issues before proceeding. The minor issues can be fixed during implementation.
+**REVISE** — Address the critical and major issues before proceeding.
 
 ## Confidence: 0.78
-`,
+`;
+    },
 
-    qa: `# Test Plan
+    qa: () => `# Test Plan
 
 ## Unit Tests
 
@@ -204,133 +238,110 @@ The implementation plan for rate limiting and audit logging is generally solid a
 - Rate limiter returns 429 with correct Retry-After header
 - Rate limiter extracts correct key from request (API key, user ID)
 - Rate limiter allows traffic when under limit
-- Graceful degradation when state store is unavailable
-
+${hasLessons ? "- **[Learned]** Redis-backed state is consistent across multiple instances\n- **[Learned]** Concurrent requests at boundary don't exceed limit (race condition regression)\n" : "- Graceful degradation when state store is unavailable\n"}
 ### Audit Logger Tests
 - Audit event published to Redis queue successfully
 - Circuit breaker opens after configured failure threshold
 - Events buffered locally when circuit breaker is open
 - Buffer flushed when circuit breaker closes
-- Audit event schema validation (all required fields present)
-
+${hasLessons ? "- **[Learned]** Buffer flush uses exponential backoff with jitter (no thundering herd)\n" : "- Audit event schema validation\n"}
 ## Integration Tests
 - End-to-end: API request → rate limit check → audit log written
 - Rate limiting works across multiple sequential requests
 - Audit consumer processes events from Redis queue to PostgreSQL
-- Database migration creates correct schema and indexes
 
 ## Edge Cases
 - Rate limit boundary: exactly at limit (should allow) vs one over (should reject)
 - Concurrent requests from same API key at limit boundary
-- Audit logger handles malformed events without crashing
 - Redis connection drops mid-operation
 - **Feature flag off-path**: Rate limiting disabled via feature flag — verify requests pass through
-- **Feature flag default**: Verify flag defaults to OFF (learned from notifications feature bug)
-
-## Performance Tests
-- Rate limiter adds <5ms latency per request
-- Audit logging (async) adds <2ms to request path
-- System handles 500 rps with rate limiting enabled
-- Audit consumer processes backlog within 30 seconds
-
-## Test Data Requirements
-- 5 API keys with different rate limit tiers
-- Pre-populated audit_logs table for query tests
-- Redis instance for integration tests (not mocked)
+- **Feature flag default**: Verify flag defaults to OFF
 
 ## Simulated Results
-- Unit tests: 24/24 passing
+- Unit tests: ${hasLessons ? "28/28" : "24/24"} passing
 - Integration tests: 8/8 passing
-- Edge case tests: 6/7 passing (1 FAIL: concurrent boundary race condition detected)
+- Edge case tests: ${hasLessons ? "7/7 passing" : "6/7 passing (1 FAIL: concurrent boundary race condition)"}
 - Performance tests: 4/4 passing
+${hasLessons ? "\n**All previous regression tests now passing.** The Redis-backed rate limiter resolved the concurrent boundary race condition from Run " + (runNumber - 1) + ".\n" : "\n### Failing Test\n**FAIL: concurrent_boundary_race_condition** — In-memory token bucket race condition. Redis-backed state would fix this.\n"}`,
 
-### Failing Test Detail
-**FAIL: concurrent_boundary_race_condition**
-When 10 concurrent requests arrive at the exact rate limit boundary, 2 requests occasionally pass when only 1 should. This is the in-memory token bucket race condition the reviewer flagged — Redis-backed state would fix this.
-`,
-
-    sre: `# Operational Risk Assessment & Runbook
+    sre: () => `# Operational Risk Assessment & Runbook
 
 ## Pre-Deploy Checklist
-- [ ] Circuit breaker configured on Redis connection with sensible thresholds
-- [ ] Connection pool size for PostgreSQL tuned based on load test (NOT defaults)
-- [ ] Health check endpoint includes Redis connectivity status
+- [${hasLessons ? "x" : " "}] Circuit breaker configured on Redis connection
+- [${hasLessons ? "x" : " "}] Connection pool size for PostgreSQL tuned based on load test
+- [${hasLessons ? "x" : " "}] Health check endpoint includes Redis connectivity status
 - [ ] Feature flag \`billing.ratelimit.enabled\` defaults to OFF
 - [ ] Monitoring dashboards updated with new metrics
 - [ ] Runbook reviewed and approved
-
+${hasLessons ? "\n**Note**: Items marked [x] were flagged in previous runs and have been pre-verified.\n" : ""}
 ## Deployment Steps
 1. Deploy database migration (audit_logs table) — zero-downtime, additive only
-2. Deploy audit consumer service (can run idle until events flow)
+2. Deploy audit consumer service
 3. Deploy billing service with rate limiter and audit logger (feature flagged OFF)
 4. Verify health checks pass on all pods
 5. Enable feature flag for 5% of traffic (canary)
 6. Monitor error rates and latency for 15 minutes
 7. Gradually increase to 25% → 50% → 100%
-8. Verify audit logs are flowing to PostgreSQL
 
 ## Monitoring & Alerts
 | Metric | Threshold | Action |
 |--------|-----------|--------|
-| 429 response rate | >10% of total requests | Investigate rate limit config |
+| 429 response rate | >10% of total | Investigate rate limit config |
 | Audit queue depth | >10,000 events | Scale audit consumer |
 | Audit consumer lag | >60 seconds | Page on-call SRE |
-| Redis circuit breaker open | Any | Alert — audit events buffering locally |
-| Billing API p99 latency | >200ms (current baseline: 45ms) | Investigate, possible rollback |
-| Error rate | >1% over 2 minutes | Page on-call (per postmortem action item) |
+| Redis circuit breaker open | Any occurrence | Alert — audit events buffering |
+| Billing API p99 latency | >200ms | Investigate, possible rollback |
+| Error rate | >1% over 2 minutes | Page on-call |
 
 ## Rollback Plan
-1. Disable feature flag \`billing.ratelimit.enabled\` → immediately stops rate limiting
-2. If audit consumer is problematic: stop consumer pods, events buffer in Redis
-3. If Redis is problematic: circuit breaker activates automatically, events buffer in memory
-4. **Nuclear rollback**: Redeploy previous billing service version (< 5 minutes)
-
-## Post-Deploy Validation
-- Confirm rate limiting returns correct 429 responses with Retry-After header
-- Confirm audit logs appearing in PostgreSQL within 5 seconds of API calls
-- Confirm no latency regression (p99 should stay under 50ms)
-- Confirm circuit breaker test: kill Redis connection, verify graceful degradation
+1. Disable feature flag → immediately stops rate limiting
+2. Stop audit consumer pods if problematic
+3. Circuit breaker activates automatically for Redis failures
+4. **Nuclear rollback**: Redeploy previous version (< 5 minutes)
 
 ## Risk Assessment
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|-----------|
-| Redis outage affects audit logging | Low | Medium | Circuit breaker + memory buffer |
-| Rate limiter adds latency | Low | Medium | Benchmarked at <5ms per request |
-| Connection pool exhaustion | Medium | High | Tuned pool sizes, circuit breaker (per postmortem mandate) |
-| Feature flag misconfiguration | Low | High | Default OFF, gradual rollout |
+| Redis outage | Low | Medium | Circuit breaker + memory buffer |
+| Rate limiter latency | Low | Medium | Benchmarked at <5ms |
+| Connection pool exhaustion | ${hasLessons ? "Low (tuned)" : "Medium"} | High | ${hasLessons ? "**[Learned]** Tuned + circuit breaker" : "Needs tuning + circuit breaker"} |
 
-**Overall risk: MEDIUM** — Proceed with canary deployment and staged rollout.
+**Overall risk: ${hasLessons ? "LOW" : "MEDIUM"}** — ${hasLessons ? "Previous lessons applied, pre-verified checklist items." : "Proceed with canary deployment and staged rollout."}
 `,
 
-    cto: `# CTO Decision
+    cto: () => {
+      const score = hasLessons ? Math.min(9, 7 + runNumber - 1) : 7;
+      const decision = hasLessons ? "APPROVED" : "APPROVED WITH CONDITIONS";
 
-## Decision: APPROVED WITH CONDITIONS
+      return `# CTO Decision
 
-## Score: 7/10
+## Decision: ${decision}
 
+## Score: ${score}/10
+${lessonBlock}
 ## Strengths
-1. **Async audit logging pattern is correct** — The team learned from the notifications feature debacle and is not repeating the synchronous logging mistake. Good institutional learning.
-2. **Circuit breaker included** — This addresses our mandatory requirement from the March 2025 postmortem. Non-negotiable, and it's here.
-3. **Dual-layer rate limiting** — Both gateway and service-level, per our API design guide. This is how it should be done.
+1. **Async audit logging pattern is correct** — The team learned from the notifications feature debacle and is not repeating the synchronous logging mistake.
+2. **Circuit breaker included** — This addresses our mandatory requirement from the March 2025 postmortem.
+3. **Dual-layer rate limiting** — Both gateway and service-level, per our API design guide.
 4. **Feature flag with canary rollout** — Proper deployment risk mitigation.
-
+${hasLessons ? "5. **[Improvement]** Redis-backed rate limiter state — Previous run's race condition has been resolved.\n6. **[Improvement]** Backoff with jitter on audit flush — Thundering herd risk eliminated.\n" : ""}
 ## Concerns
-1. **Race condition in rate limiter** — QA found a real bug with in-memory state in multi-pod environments. This MUST be fixed with Redis-backed state before production.
-2. **Audit buffer flush strategy** — Reviewer correctly flagged the missing backoff. Without jitter, we risk repeating the retry amplification from the payment outage.
-3. **Test coverage gap** — The concurrent boundary test is failing. I want this green before merge.
+${hasLessons
+  ? "1. **Minor**: Connection pool sizes should be documented with specific values.\n2. **Minor**: Correlation IDs should be added to audit events for traceability.\n\nAll critical and major issues from the previous run have been addressed."
+  : "1. **Critical**: Rate limiter uses in-memory state — race condition risk in multi-pod deployment. MUST fix.\n2. **Major**: Audit buffer flush has no backoff strategy — thundering herd risk.\n3. **Major**: QA found a failing concurrent boundary test — must be green before merge."}
 
 ## Conditions for Approval
-1. Switch to Redis-backed rate limiter state (fixes QA race condition)
-2. Add exponential backoff with jitter to audit buffer flush
-3. Fix the failing concurrent boundary test
-4. All reviewer comments addressed
+${hasLessons
+  ? "1. Add specific connection pool configuration values\n2. Add correlation IDs to audit events\n\nThese are minor items that can be addressed during implementation."
+  : "1. Switch to Redis-backed rate limiter state\n2. Add exponential backoff with jitter to audit buffer flush\n3. Fix the failing concurrent boundary test\n4. All reviewer comments addressed"}
 
 ## Lessons for the Organization
-- The team is demonstrating institutional learning: async logging, circuit breakers, dual-layer rate limiting all came from past incidents. This is exactly how we improve.
-- However, the race condition shows we need to be more careful about multi-instance behavior in design reviews.
-- **New lesson**: Any in-memory state used for rate limiting or throttling must be evaluated for multi-instance correctness during architecture review.
-`,
+${hasLessons
+  ? "- The team is demonstrating strong institutional learning. Critical issues from Run " + (runNumber - 1) + " were proactively addressed.\n- **New lesson**: Connection pool configurations should be documented explicitly, not left as 'to be tuned'.\n- The improvement from Run " + (runNumber - 1) + " to Run " + runNumber + " validates that our memory system is working."
+  : "- **New lesson**: Any in-memory state used for rate limiting must be evaluated for multi-instance correctness during architecture review.\n- **New lesson**: Audit buffer flush must use exponential backoff with jitter to prevent thundering herd.\n- The team is demonstrating good institutional learning from past incidents."}
+`;
+    },
   };
 
-  return responses[role];
+  return responses[role]();
 }

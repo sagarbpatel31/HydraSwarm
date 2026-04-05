@@ -6,27 +6,45 @@ import {
 } from "@/lib/hydra";
 import { AGENT_ORDER } from "@/types/run";
 
+// Wrap a promise with a timeout
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q") || "engineering software development";
+  const TIMEOUT = 8000; // 8 second timeout per call
 
   try {
-    // Fetch all memory types in parallel
-    const [knowledge, shared, ...agentMemories] = await Promise.all([
-      recallKnowledge(query, 10).catch(() => []),
-      recallSharedMemory(query, 10).catch(() => []),
-      ...AGENT_ORDER.map((role) =>
-        recallAgentMemory(role, query, 5).catch(() => [])
-      ),
+    // Fetch knowledge and shared in parallel (most important)
+    const [knowledge, shared] = await Promise.all([
+      withTimeout(recallKnowledge(query, 10).catch(() => []), TIMEOUT, []),
+      withTimeout(recallSharedMemory(query, 10).catch(() => []), TIMEOUT, []),
     ]);
 
-    // Build per-agent memory map
+    // Fetch agent memories in parallel (with individual timeouts)
+    const agentResults = await Promise.all(
+      AGENT_ORDER.map((role) =>
+        withTimeout(
+          recallAgentMemory(role, query, 3).catch(() => []),
+          TIMEOUT,
+          []
+        ).then((items) => ({ role, items }))
+      )
+    );
+
     const agentMemoryMap: Record<string, typeof knowledge> = {};
-    AGENT_ORDER.forEach((role, i) => {
-      if (agentMemories[i]?.length > 0) {
-        agentMemoryMap[role] = agentMemories[i];
+    for (const { role, items } of agentResults) {
+      if (items.length > 0) {
+        agentMemoryMap[role] = items;
       }
-    });
+    }
+
+    const agentCount = Object.values(agentMemoryMap).reduce((sum, arr) => sum + arr.length, 0);
 
     return NextResponse.json({
       knowledge,
@@ -35,8 +53,8 @@ export async function GET(request: NextRequest) {
       stats: {
         knowledgeCount: knowledge.length,
         sharedCount: shared.length,
-        agentCount: Object.values(agentMemoryMap).reduce((sum, arr) => sum + arr.length, 0),
-        totalCount: knowledge.length + shared.length + Object.values(agentMemoryMap).reduce((sum, arr) => sum + arr.length, 0),
+        agentCount,
+        totalCount: knowledge.length + shared.length + agentCount,
       },
     });
   } catch (err) {

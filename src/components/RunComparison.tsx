@@ -189,7 +189,7 @@ export function RunComparison({ runs }: { runs: RunResult[] }) {
       </div>
 
       {/* Learning proof */}
-      <SectionCard title="Why Run #{rightIdx + 1} is better" subtitle="The institutional memory that changed between runs.">
+      <SectionCard title={`Why Run #${rightIdx + 1} is better`} subtitle="The institutional memory that changed between runs.">
         <div className="rounded-2xl bg-gradient-to-r from-accent-50 to-emerald-50 border border-accent-200 p-5">
           <p className="text-sm font-semibold text-slate-900">Learning Loop Proof</p>
           <div className="mt-3 space-y-2">
@@ -199,13 +199,14 @@ export function RunComparison({ runs }: { runs: RunResult[] }) {
                 <div>
                   <p className="text-sm font-medium text-slate-800">[{l.title}] {l.content}</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Stored after Run #{leftIdx + 1} → Recalled by agents in Run #{rightIdx + 1}
+                    {`Stored after Run #${leftIdx + 1} → Recalled by agents in Run #${rightIdx + 1}`}
                   </p>
+
                 </div>
               </div>
             ))}
             {left.lessons.length === 0 && (
-              <p className="text-sm text-slate-500">No lessons from Run #{leftIdx + 1} to compare.</p>
+              <p className="text-sm text-slate-500">{`No lessons from Run #${leftIdx + 1} to compare.`}</p>
             )}
           </div>
         </div>

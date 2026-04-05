@@ -129,6 +129,12 @@ async function executeRun(runId: string, useMock: boolean) {
         ...recallBundle.knowledge.map((k) => k.title),
         ...recallBundle.roleMemory.map((m) => m.title),
         ...recallBundle.sharedMemory.map((s) => s.title),
+      ].filter((t) => t);
+
+      step.recallDetails = [
+        ...recallBundle.knowledge.map((k) => ({ id: k.id, title: k.title, content: k.content.slice(0, 200), score: k.score, bucket: "knowledge" as const })),
+        ...recallBundle.roleMemory.map((m) => ({ id: m.id, title: m.title, content: m.content.slice(0, 200), score: m.score, bucket: "roleMemory" as const })),
+        ...recallBundle.sharedMemory.map((s) => ({ id: s.id, title: s.title, content: s.content.slice(0, 200), score: s.score, bucket: "sharedMemory" as const })),
       ];
 
       // Step 2: Generate
@@ -139,7 +145,12 @@ async function executeRun(runId: string, useMock: boolean) {
 
       if (useMock) {
         await delay(800);
-        content = getMockResponse(role, run.taskDescription);
+        content = getMockResponse(
+          role,
+          run.taskDescription,
+          run.runNumber,
+          step.recallContext?.filter((c) => c) ?? []
+        );
       } else {
         const prompt = buildPrompt(
           role,
@@ -231,24 +242,33 @@ async function runEvaluation(
   // Extract lessons
   let lessons: Lesson[];
   if (useMock) {
-    lessons = [
-      {
-        id: `lesson-${runId}-1`,
-        category: "architecture",
-        insight:
-          "In-memory state for rate limiting must be evaluated for multi-instance correctness. Redis-backed state is required for distributed rate limiters.",
-        source: runId,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: `lesson-${runId}-2`,
-        category: "reliability",
-        insight:
-          "Audit buffer flush must use exponential backoff with jitter to prevent thundering herd when circuit breaker closes.",
-        source: runId,
-        createdAt: new Date().toISOString(),
-      },
+    // Different lessons per run to demonstrate progressive learning
+    const runNum = runs.get(runId)?.runNumber ?? 1;
+    const lessonSets: Array<Array<{ category: string; insight: string }>> = [
+      // Run 1 lessons
+      [
+        { category: "architecture", insight: "In-memory state for rate limiting must be evaluated for multi-instance correctness. Redis-backed state is required for distributed rate limiters." },
+        { category: "reliability", insight: "Audit buffer flush must use exponential backoff with jitter to prevent thundering herd when circuit breaker closes." },
+      ],
+      // Run 2 lessons (different, building on run 1)
+      [
+        { category: "process", insight: "Connection pool configurations should be documented explicitly with specific values, not left as 'to be tuned later'." },
+        { category: "testing", insight: "Concurrent boundary tests must be included in the CI pipeline to catch race conditions early. Redis-backed state resolved the flaky test from the previous run." },
+      ],
+      // Run 3+ lessons
+      [
+        { category: "architecture", insight: "Correlation IDs should be mandatory in all audit events and propagated across service boundaries for end-to-end traceability." },
+        { category: "performance", insight: "Rate limit thresholds should be configurable per-route, not global — different endpoints have different traffic patterns and SLAs." },
+      ],
     ];
+    const setIdx = Math.min(runNum - 1, lessonSets.length - 1);
+    lessons = lessonSets[setIdx].map((l, i) => ({
+      id: `lesson-${runId}-${i + 1}`,
+      category: l.category,
+      insight: l.insight,
+      source: runId,
+      createdAt: new Date().toISOString(),
+    }));
   } else {
     lessons = await extractLessons(runId, artifacts);
   }

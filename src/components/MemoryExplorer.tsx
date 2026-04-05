@@ -31,7 +31,8 @@ type Tab = "all" | "knowledge" | "shared" | "agents";
 
 export function MemoryExplorer() {
   const [data, setData] = useState<ExploreData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("engineering software development");
   const [tab, setTab] = useState<Tab>("all");
   const [selectedAgent, setSelectedAgent] = useState<AgentRole | "all">("all");
@@ -41,9 +42,14 @@ export function MemoryExplorer() {
     try {
       const resp = await fetch(`/api/memory/explore?q=${encodeURIComponent(q)}`);
       const json = await resp.json();
-      setData(json);
-    } catch {
-      // ignore
+      if (json.error) {
+        setError(json.error);
+      } else {
+        setData(json);
+        setError(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load memory");
     } finally {
       setLoading(false);
     }
@@ -151,7 +157,17 @@ export function MemoryExplorer() {
 
         {/* Content */}
         <div className="mt-4 space-y-3 max-h-[600px] overflow-y-auto">
-          {loading && <p className="text-sm text-slate-500 animate-pulse">Searching HydraDB...</p>}
+          {loading && (
+            <div className="flex items-center justify-center py-10">
+              <RefreshCw className="h-5 w-5 text-accent-500 animate-spin mr-2" />
+              <p className="text-sm text-slate-500">Searching HydraDB...</p>
+            </div>
+          )}
+          {error && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              {error}. Make sure you&apos;ve seeded demo data first.
+            </div>
+          )}
 
           {!loading && data && (
             <>

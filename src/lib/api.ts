@@ -284,18 +284,38 @@ export async function fetchRunResult(runId: string): Promise<RunResult> {
     status: mapStatus(s.status),
   }));
 
+  // Use recallDetails (rich data) if available, fall back to recallContext (titles only)
   const recalledMemory: MemorySnippet[] = run.steps
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((s: any) => s.recallContext?.length > 0)
+    .filter((s: any) => (s.recallDetails?.length > 0) || (s.recallContext?.length > 0))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .flatMap((s: any, idx: number) =>
-      s.recallContext.filter((c: string) => c).map((title: string, i: number) => ({
-        id: `recall-${idx}-${i}`,
-        title: title || "Recalled item",
-        content: `Recalled by ${s.agentRole} agent during task processing.`,
-        bucket: i < 3 ? "knowledge" as const : i < 5 ? "roleMemory" as const : "sharedMemory" as const,
-        role: s.agentRole,
-      }))
+    .flatMap((s: any) => {
+      // Prefer recallDetails (has actual content)
+      if (s.recallDetails?.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return s.recallDetails.map((d: any) => ({
+          id: d.id,
+          title: d.title || "Recalled item",
+          content: d.content || `Recalled by ${s.agentRole} agent.`,
+          bucket: d.bucket ?? "knowledge",
+          score: d.score,
+          role: s.agentRole,
+        }));
+      }
+      // Fallback to recallContext (title strings only)
+      return s.recallContext
+        .filter((c: string) => c)
+        .map((title: string, i: number) => ({
+          id: `recall-${s.agentRole}-${i}`,
+          title: title || "Recalled item",
+          content: `Recalled by ${s.agentRole} agent during task processing.`,
+          bucket: i < 3 ? "knowledge" as const : i < 5 ? "roleMemory" as const : "sharedMemory" as const,
+          role: s.agentRole,
+        }));
+    })
+    // Deduplicate by id (same item recalled by multiple agents)
+    .filter((item: MemorySnippet, idx: number, arr: MemorySnippet[]) =>
+      arr.findIndex((other) => other.id === item.id && other.role === item.role) === idx
     );
 
   return { task, artifacts, lessons, decision, graph, replay, recalledMemory } as RunResult;
