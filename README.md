@@ -198,4 +198,4 @@ npm run test:coverage # Run with coverage report
 
 ---
 
-Built for HydraDB hackathon. [Sagar Patel](https://github.com/sagarbpatel31) + Gayatri Patil.
+Built for HydraDB hackathon. [Sagar Patel](https://github.com/sagarbpatel31) + [Gayatri Patil](https://github.com/patilgayatri22)
